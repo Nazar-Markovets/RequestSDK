@@ -1,14 +1,17 @@
 ﻿using RequestSDK.Services;
 using RequestSDK.Test.Base;
+using RequestSDK.Test.ClassData;
+using RequestSDK.Test.Integration;
 using System.Text.Json;
 using System.Web;
 using Xunit.Abstractions;
 
 namespace RequestSDK.Test.Services
 {
+    [Trait("Test", "Request Static Methods")]
     public class RequestService_Static_Testing : FixtureBase
     {
-        public RequestService_Static_Testing(ITestOutputHelper consoleWriter) : base(consoleWriter) { }
+        public RequestService_Static_Testing(ITestOutputHelper consoleWriter, ServerInstanceRunner server) : base(consoleWriter, server) { }
 
         #region Append Path
 
@@ -162,5 +165,46 @@ namespace RequestSDK.Test.Services
             Assert.Equivalent(new KeyValuePair<string, string>("Key", string.Empty), parameter);
         }
         #endregion Request Parameter
+
+        #region BasePath
+
+        [Fact(DisplayName = $"Static. {nameof(RequestService.GetBasePath)}. NULL String Value")]
+        public void Request_Base_NullString()
+        {
+            string? path = string.Empty;
+            Assert.Null(Record.Exception(() => path = RequestService.GetBasePath(path: default(string)!)));
+            Assert.Null(path);
+        }
+
+        [Fact(DisplayName = $"Static. {nameof(RequestService.GetBasePath)}. NULL Uri Value")]
+        public void Request_Base_NullUri()
+        {
+            string? path = string.Empty;
+            Assert.Null(Record.Exception(() => path = RequestService.GetBasePath(path: default(Uri)!)));
+            Assert.Null(path);
+        }
+
+        [Fact(DisplayName = $"Static. {nameof(RequestService.GetBasePath)}. Empty String Value")]
+        public void Request_Base_EmptyString()
+        {
+            Assert.Throws<InvalidCastException>(() => RequestService.GetBasePath(string.Empty));
+        }
+
+        [Theory(DisplayName = $"Static. {nameof(RequestService.GetBasePath)}. Invalid String Value")]
+        [ClassData(typeof(InvalidRoutes))]
+        public void Request_Base_InvalidString(string invalidRoute)
+        {
+            ThrowsWithMessage<InvalidCastException>(() => RequestService.GetBasePath(invalidRoute), $"Invalid route is allowed. Route : {invalidRoute}");
+        }
+
+        [Theory(DisplayName = $"Static. {nameof(RequestService.GetBasePath)}. Invalid Uri Value")]
+        [ClassData(typeof(InvalidRoutes))]
+        public void Request_Base_InvalidUri(string invalidRoute)
+        {
+            ThrowsWithMessage<UriFormatException>(() => RequestService.GetBasePath(new Uri(invalidRoute)), $"Invalid route is allowed. Route : {invalidRoute}");
+        }
+
+
+        # endregion BasePath
     }
 }

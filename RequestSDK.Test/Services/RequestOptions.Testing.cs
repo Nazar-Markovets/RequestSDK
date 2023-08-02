@@ -1,14 +1,16 @@
 ﻿using RequestSDK.Services;
 using RequestSDK.Test.Base;
 using RequestSDK.Test.ClassData;
+using RequestSDK.Test.Integration;
 using System.Net.Mime;
 using Xunit.Abstractions;
 
 namespace RequestSDK.Test.Services
 {
+    [Trait("Test", "Request Options")]
     public class RequestOptions_Testing : FixtureBase
     {
-        public RequestOptions_Testing(ITestOutputHelper consoleWriter) : base(consoleWriter){}
+        public RequestOptions_Testing(ITestOutputHelper consoleWriter, ServerInstanceRunner server) : base(consoleWriter, server) {}
 
         [Fact(DisplayName = "Creating. SDK routing")]
         public void RequestOptionsSdkRoutingInitialization() =>

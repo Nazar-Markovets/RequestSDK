@@ -46,14 +46,14 @@ public partial class RequestService
     {
         _setupOptions = requestServiceOptions ?? throw new ArgumentNullException("Request Service Options can't be null");
 
-        if(requestServiceOptions._accemblyRoutingType != null)
+        if (requestServiceOptions._accemblyRoutingType != null)
         {
             _cache = new MemoryCache(new MemoryCacheOptions());
             _routingInfo = GetCachedMetadata();
         }
-        _instances = requestServiceOptions._clients?.ToDictionary(kv => kv.HttpClientId, kv =>  kv);
+        _instances = requestServiceOptions._clients?.ToDictionary(kv => kv.HttpClientId, kv => kv);
     }
-  
+
     #region Sending Request
 
     public Task<HttpResponseMessage> ExecuteRequestAsync(Options requestOptions, HttpContent? httpContent, CancellationToken cancellationToken = default) =>
@@ -260,10 +260,13 @@ public partial class RequestService
     public static string CombineQueryWithParameters(string path, string route, bool ignoreEmpty, params KeyValuePair<string, string?>[] pairs) =>
         CombineQueryWithParameters(AppendPathSafely(path, route), ignoreEmpty, pairs);
 
-    public static string GetBasePath(string path) =>
-        TryUriParse(path, out Uri? url)
+    public static string? GetBasePath(string? path)
+    {
+        if (path is null) return default;
+        return TryUriParse(path, out Uri? url) && HasValidScheme(url!)
         ? $"{url!.Scheme}{Uri.SchemeDelimiter}{url!.Authority}"
         : throw new InvalidCastException("Can't convert invalid path");
+    }
 
     public static bool TryUriParse(string? path, out Uri? url) =>
         Uri.TryCreate(path, new UriCreationOptions() { DangerousDisablePathAndQueryCanonicalization = false }, out url);
@@ -271,7 +274,32 @@ public partial class RequestService
     public static string? GetBasePath(Uri? path)
     {
         if (path is null) return default;
+        if (HasValidScheme(path) == false) throw new UriFormatException("Path has invalid scheme");
         return $"{path.Scheme}{Uri.SchemeDelimiter}{path.Authority}";
+    }
+
+    private static bool HasValidScheme(Uri path)
+    {
+
+        string[] validSchemes = {
+            Uri.UriSchemeFile,
+            Uri.UriSchemeFtp,
+            Uri.UriSchemeSftp,
+            Uri.UriSchemeFtps,
+            Uri.UriSchemeGopher,
+            Uri.UriSchemeHttp,
+            Uri.UriSchemeHttps,
+            Uri.UriSchemeWs,
+            Uri.UriSchemeWss,
+            Uri.UriSchemeMailto,
+            Uri.UriSchemeNews,
+            Uri.UriSchemeNntp,
+            Uri.UriSchemeSsh,
+            Uri.UriSchemeTelnet,
+            Uri.UriSchemeNetTcp,
+            Uri.UriSchemeNetPipe
+        };
+        return validSchemes.Contains(path.Scheme);
     }
 
     public static string AppendPathSafely(string path, string route, bool cleanExistsParameters = true, bool autoEncode = false)
@@ -279,7 +307,7 @@ public partial class RequestService
         path = path.Trim();
         if (string.IsNullOrWhiteSpace(path)) throw new ArgumentNullException("Can't combine empty absolute path");
         route = route.TrimStart('/').Trim();
-        string basePath = GetBasePath(path);
+        string basePath = GetBasePath(path)!;
         string queryPath = $"{basePath}/{route}";
 
         if (cleanExistsParameters is false)

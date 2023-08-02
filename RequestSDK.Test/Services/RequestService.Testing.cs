@@ -1,37 +1,38 @@
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Mvc.Testing;
 using RequestSDK.Attributes;
 using RequestSDK.Services;
 using RequestSDK.Test.Base;
+using RequestSDK.Test.Integration;
+using System.Diagnostics;
+using System.Net.Http;
+using System.Reflection;
 using Xunit.Abstractions;
 
 namespace RequestSDK.Test.Services;
 
+
+[Trait("Test", "Request Service Usage")]
 public partial class RequestService_Testing : FixtureBase
 {
-    public RequestService_Testing(ITestOutputHelper consoleWriter) : base(consoleWriter){}
+    public RequestService_Testing(ITestOutputHelper consoleWriter, ServerInstanceRunner server) : base(consoleWriter, server) => RunAPI();
 
     [Fact(DisplayName = "Creating Get")]
     public async Task RequestOptions_Initialization()
     {
         RequestService requestService = new();
-        HttpResponseMessage response = await requestService.ExecuteRequestAsync(new RequestService.Options(HttpMethod.Get, "https://api.github.com/users/Nazar-Markovets").
-                                                                                    AddHeader("User-Agent", "Awesome-Octocat-App"));
-
+        HttpResponseMessage response = await requestService.ExecuteRequestAsync(new RequestService.Options(HttpMethod.Get, $"{ServerBaseUrl}status/service_status"));
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK);
+
     }
 
-    //[Fact(DisplayName = "Creating Options")]
-    //public void HttpClientSettings_Initialization()
-    //{
-    //    TimeSpan timeSpan = TimeSpan.MaxValue;
-    //    RequestService requestService = new RequestService(new RequestService.RequestServiceOptions<>);
-    //}
-
-    //[Fact(DisplayName = "Creating Instance")]
-    //public void Request_Initialization()
-    //{
-    //    TimeSpan timeSpan = TimeSpan.MaxValue;
-    //    RequestService requestService = new RequestService((time) => typeof(AccemblyRouting));
-    //}
+    [Fact(DisplayName = "Creating Options")]
+    public async Task HttpClientSettings_Initialization()
+    {
+        RequestService requestService = new();
+        HttpResponseMessage response = await requestService.ExecuteRequestAsync(new RequestService.Options(HttpMethod.Get, $"{ServerBaseUrl}status/service_status"));
+        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK);
+    }
 }
 
 public class AccemblyRouting
