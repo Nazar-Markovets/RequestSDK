@@ -42,26 +42,24 @@ public partial class RequestService_Testing : FixtureBase
             }
         };
 
-        var requestService = new RequestService(requestOptions);
-        var result = await requestService.ExecuteRequestAsync(new RequestService.Options(HttpMethod.Get, "https://example.com", 1), httpContent : new StringContent("Request content"));
+        RequestService requestService = new(requestOptions);
+        HttpResponseMessage response = await requestService.ExecuteRequestAsync(new RequestService.Options(HttpMethod.Get, "https://example.com", 1), httpContent: new StringContent("Request content"));
 
-        Assert.Equal(HttpStatusCode.OK, result.StatusCode);
-        var content = await result.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        string content = await response.Content.ReadAsStringAsync();
         Assert.Equal("Mocked response", content);
 
     }
 
-    [Fact(DisplayName = "Creating Variable")]
+    [SkippableFact(DisplayName = "Creating Variable")]
     public async Task HttpClientSettings_Initialization()
     {
-        if(Convert.ToBoolean(Environment.GetEnvironmentVariable("GIT_WORKFLOW")))
-        {
-
-        }
-        else
-        {
-            Assert.Fail("NO VARIABLE");
-        }
+        RunAPI();
+        RequestService requestService = new ();
+        HttpResponseMessage response = await requestService.ExecuteRequestAsync(new RequestService.Options(HttpMethod.Get, GenerateRequestRoute("status/service_status")));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        string content = await response.Content.ReadAsStringAsync();
+        Assert.Equal("API is ready", content);
     }
 }
 

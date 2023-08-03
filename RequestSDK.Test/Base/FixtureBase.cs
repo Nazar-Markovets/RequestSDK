@@ -31,12 +31,13 @@ public class FixtureBase : IClassFixture<ServerInstanceRunner>
 
     protected void RunAPI()
     {
-        #if DEBUG
+#if CLOUD_GIT
+        Skip.If(Convert.ToBoolean(Environment.GetEnvironmentVariable("GIT_WORKFLOW")), "Supported only on local machine");
+#endif
         serverInstance.Run(ServerPort);
-        #else
-        Assert.Fail("Setup server is available only localy");
-        #endif
     }
+
+    protected string GenerateRequestRoute(string routeName) => new Uri(ServerBaseUrl, routeName).ToString();
 
     private void RunModuleTestIntegration(Action<IServiceCollection>? configureServices = default)
     {

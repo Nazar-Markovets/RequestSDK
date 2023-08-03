@@ -7,22 +7,29 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestSDK", "RequestSDK\Re
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestSDK.Test", "RequestSDK.Test\RequestSDK.Test.csproj", "{8988BF3B-7BD6-46B2-B3EB-A50A35C95F33}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RequestSDK.Test.API", "RequestSDK.Test.API\RequestSDK.Test.API.csproj", "{24F1296E-3D0D-4343-9AD9-9E7CF739CD1E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RequestSDK.Test.API", "RequestSDK.Test.API\RequestSDK.Test.API.csproj", "{24F1296E-3D0D-4343-9AD9-9E7CF739CD1E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Cloud.Git|Any CPU = Cloud.Git|Any CPU
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AE933137-4A55-499A-BCB7-86424A8377CB}.Cloud.Git|Any CPU.ActiveCfg = Release|Any CPU
+		{AE933137-4A55-499A-BCB7-86424A8377CB}.Cloud.Git|Any CPU.Build.0 = Release|Any CPU
 		{AE933137-4A55-499A-BCB7-86424A8377CB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{AE933137-4A55-499A-BCB7-86424A8377CB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AE933137-4A55-499A-BCB7-86424A8377CB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AE933137-4A55-499A-BCB7-86424A8377CB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8988BF3B-7BD6-46B2-B3EB-A50A35C95F33}.Cloud.Git|Any CPU.ActiveCfg = Cloud.Git|Any CPU
+		{8988BF3B-7BD6-46B2-B3EB-A50A35C95F33}.Cloud.Git|Any CPU.Build.0 = Cloud.Git|Any CPU
 		{8988BF3B-7BD6-46B2-B3EB-A50A35C95F33}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{8988BF3B-7BD6-46B2-B3EB-A50A35C95F33}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8988BF3B-7BD6-46B2-B3EB-A50A35C95F33}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8988BF3B-7BD6-46B2-B3EB-A50A35C95F33}.Release|Any CPU.Build.0 = Release|Any CPU
+		{24F1296E-3D0D-4343-9AD9-9E7CF739CD1E}.Cloud.Git|Any CPU.ActiveCfg = Release|Any CPU
+		{24F1296E-3D0D-4343-9AD9-9E7CF739CD1E}.Cloud.Git|Any CPU.Build.0 = Release|Any CPU
 		{24F1296E-3D0D-4343-9AD9-9E7CF739CD1E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{24F1296E-3D0D-4343-9AD9-9E7CF739CD1E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{24F1296E-3D0D-4343-9AD9-9E7CF739CD1E}.Release|Any CPU.ActiveCfg = Release|Any CPU
