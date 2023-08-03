@@ -39,19 +39,19 @@ public partial class RequestService
 
     public RequestService()
     {
-        _setupOptions = new RequestServiceOptions(default);
+        _setupOptions = new RequestServiceOptions();
     }
 
     public RequestService(RequestServiceOptions requestServiceOptions)
     {
         _setupOptions = requestServiceOptions ?? throw new ArgumentNullException("Request Service Options can't be null");
 
-        if (requestServiceOptions._accemblyRoutingType != null)
+        if (requestServiceOptions.AccemblyRoutingType != null)
         {
             _cache = new MemoryCache(new MemoryCacheOptions());
             _routingInfo = GetCachedMetadata();
         }
-        _instances = requestServiceOptions._clients?.ToDictionary(kv => kv.HttpClientId, kv => kv);
+        _instances = requestServiceOptions.Clients?.ToDictionary(kv => kv.HttpClientId, kv => kv);
     }
 
     #region Sending Request
@@ -65,32 +65,11 @@ public partial class RequestService
     public Task<HttpResponseMessage> ExecuteRequestAsync<TBody>(Options requestOptions, TBody DTO, JsonSerializerOptions serializerOptions = default!, CancellationToken cancellationToken = default) =>
         MakeRequest(requestOptions, new StringContent(JsonSerializer.Serialize(DTO, serializerOptions), Encoding.UTF8, requestOptions.ContentType), cancellationToken);
 
-    /// <summary>
-    /// Creating <see cref="HttpClient"/> and sending HttpRequest
-    /// <list type="number">
-    ///     <item>Try to get registered Request Instance for <see cref="IHttpClientFactory"/></item>
-    ///     <item>Try to get registered <see cref="HttpClientSettings"/> for the instance</item>
-    ///     <item>Try to create <see cref="HttpClient"/> using <see cref="IHttpClientFactory"/> and it's pool</item>
-    ///     <item>Try to create <see cref="HttpClient"/> if <see cref="IHttpClientFactory"/> was not set</item>
-    ///     <item>Try to get registered Controller Name and Controller Action HttpMethod from Options.Path</item>
-    ///     <item>Try to combine <see cref="HttpClient.BaseAddress"/> and <see cref="Options.Path"/></item>
-    ///     <item>Try to combine combined path with <see cref="Options.RequestParameters"/></item>
-    ///     <item>Add AcceptHeaders from <see cref="Options.AcceptTypes"/> <see langword="or"/> set <see cref="MediaTypeWithQualityHeaderValue" langword=" with */*"/></item>
-    ///     <item>Add AuthenticationHeader from <see cref="Options.Authentication"/> <see langword="or"/> invoke <see cref="Func{AuthenticationHeaderValue}" langword=" from ctor()"/></item>
-    ///     <item>Add CustomHeaders from <see cref="Options.CustomHeaders"/></item>
-    ///     <item>Sending Request using <see cref="HttpCompletionOption"/>, <see cref="HttpCompletionOption.ResponseHeadersRead"/> allows to use streaming as response</item>
-    /// </list>
-    /// </summary>
-    /// <param name="options"></param>
-    /// <param name="content"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
-    /// <exception cref="Exception"></exception>
     public Task<HttpResponseMessage> MakeRequest(Options options, HttpContent? content, CancellationToken cancellationToken)
     {
         byte requestedSetting = byte.TryParse(options.HttpClientId?.ToString(), out byte clientId) ? clientId : byte.MinValue;
         HttpClientSettings? registeredSetting = _instances?.ContainsKey(requestedSetting) is true ? _instances![requestedSetting] : default;
-        HttpClient httpClient = _setupOptions._factory?.CreateClient(registeredSetting?.HttpClientName ?? Microsoft.Extensions.Options.Options.DefaultName) ?? new HttpClient();
+        HttpClient httpClient = _setupOptions.Factory?.CreateClient(registeredSetting?.HttpClientName ?? Microsoft.Extensions.Options.Options.DefaultName) ?? new HttpClient();
         string requestQuery = string.Empty;
 
         //Request Path
@@ -116,7 +95,7 @@ public partial class RequestService
             if (options.AcceptTypes is null) httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
             else options.AcceptTypes?.ForEach(acceptType => httpClient.DefaultRequestHeaders.Accept.Add(acceptType));
 
-            AuthenticationHeaderValue? authenticationHeader = options.Authentication ?? _setupOptions._authentication?.Invoke();
+            AuthenticationHeaderValue? authenticationHeader = options.Authentication ?? _setupOptions.Authentication?.Invoke();
             httpClient.DefaultRequestHeaders.Authorization = authenticationHeader;
 
             options.CustomHeaders?.ToList()?.ForEach(header => httpClient.DefaultRequestHeaders.Add(header.Key, header.Value));
@@ -178,7 +157,7 @@ public partial class RequestService
 
     private ImmutableSortedSet<(string Route, string Controller, string RequestPath, HttpRequestMethod RequestMethod)> GetMetadata()
     {
-        var routes = _setupOptions._accemblyRoutingType!.GetTypeInfo().DeclaredNestedTypes
+        var routes = _setupOptions.AccemblyRoutingType!.GetTypeInfo().DeclaredNestedTypes
                                     .SelectMany(typeInfo => typeInfo.DeclaredFields
                                                                     .Where(fieldInfo => fieldInfo.IsLiteral && !fieldInfo.IsInitOnly)
                                                                     .Select(@const =>
@@ -208,8 +187,6 @@ public partial class RequestService
     #region Static Methods
 
     public static KeyValuePair<string, string?> RequestParameter(string? key, string? value) => new(key ?? "", value ?? "");
-
-    private static string ClearSSePreffix(string text) => text.IndexOf("data:", StringComparison.Ordinal) != 0 ? text.Trim() : text[5..].Trim();
 
     public static string CombineQueryParameters(bool ignoreEmpty, params KeyValuePair<string, string?>[] queryParameters)
     {
@@ -278,30 +255,6 @@ public partial class RequestService
         return $"{path.Scheme}{Uri.SchemeDelimiter}{path.Authority}";
     }
 
-    private static bool HasValidScheme(Uri path)
-    {
-
-        string[] validSchemes = {
-            Uri.UriSchemeFile,
-            Uri.UriSchemeFtp,
-            Uri.UriSchemeSftp,
-            Uri.UriSchemeFtps,
-            Uri.UriSchemeGopher,
-            Uri.UriSchemeHttp,
-            Uri.UriSchemeHttps,
-            Uri.UriSchemeWs,
-            Uri.UriSchemeWss,
-            Uri.UriSchemeMailto,
-            Uri.UriSchemeNews,
-            Uri.UriSchemeNntp,
-            Uri.UriSchemeSsh,
-            Uri.UriSchemeTelnet,
-            Uri.UriSchemeNetTcp,
-            Uri.UriSchemeNetPipe
-        };
-        return validSchemes.Contains(path.Scheme);
-    }
-
     public static string AppendPathSafely(string path, string route, bool cleanExistsParameters = true, bool autoEncode = false)
     {
         path = path.Trim();
@@ -335,6 +288,30 @@ public partial class RequestService
         byte[] jsonBytes = Convert.FromBase64String(base64EncodedJson);
         string json = Encoding.UTF8.GetString(jsonBytes);
         return JsonSerializer.Deserialize<T>(json);
+    }
+
+    private static string ClearSSePreffix(string text) => text.IndexOf("data:", StringComparison.Ordinal) != 0 ? text.Trim() : text[5..].Trim();
+    private static bool HasValidScheme(Uri path)
+    {
+        string[] validSchemes = {
+            Uri.UriSchemeFile,
+            Uri.UriSchemeFtp,
+            Uri.UriSchemeSftp,
+            Uri.UriSchemeFtps,
+            Uri.UriSchemeGopher,
+            Uri.UriSchemeHttp,
+            Uri.UriSchemeHttps,
+            Uri.UriSchemeWs,
+            Uri.UriSchemeWss,
+            Uri.UriSchemeMailto,
+            Uri.UriSchemeNews,
+            Uri.UriSchemeNntp,
+            Uri.UriSchemeSsh,
+            Uri.UriSchemeTelnet,
+            Uri.UriSchemeNetTcp,
+            Uri.UriSchemeNetPipe
+        };
+        return validSchemes.Contains(path.Scheme);
     }
 
     #endregion Static Methods

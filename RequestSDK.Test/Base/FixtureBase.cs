@@ -1,11 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using RequestSDK.Test.ClassData;
 using RequestSDK.Test.Integration;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Xunit.Abstractions;
 
 namespace RequestSDK.Test.Base;
@@ -37,15 +31,11 @@ public class FixtureBase : IClassFixture<ServerInstanceRunner>
 
     protected void RunAPI()
     {
-        try
-        {
-            serverInstance.Run(ServerPort);
-        }
-        catch
-        {
-            throw new ApplicationException("Server instance can't be started. Check accembly for errors");
-        }
-        
+        #if DEBUG
+        serverInstance.Run(ServerPort);
+        #else
+        Assert.Fail("Setup server is available only localy");
+        #endif
     }
 
     private void RunModuleTestIntegration(Action<IServiceCollection>? configureServices = default)

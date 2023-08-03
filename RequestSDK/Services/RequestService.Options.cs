@@ -1,12 +1,11 @@
-﻿using System.Net.Http;
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Net.Mime;
 
 namespace RequestSDK.Services;
 
 public partial class RequestService
 {
-    public class Options
+    public sealed class Options
     {
         internal HttpMethod? HttpMethod { get; set; }
         internal KeyValuePair<string, string?>[] RequestParameters { get; private set; }
