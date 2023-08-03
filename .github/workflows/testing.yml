@@ -1,31 +1,38 @@
 # This workflow will build a .NET project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
 
-name: .NET
+name: .NET Jobs
 
 on:
   push:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
-
 env:
   GIT_WORKFLOW : 'true'
-
+  BUILD_CONFIG : 'CLOUD.GIT'
+  GREEN: '\033[32m'
+  RESET: '\033[0m'
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v3
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: 6.0.x
-    - name: Restore dependencies
-      run: dotnet restore
-    - name: Build
-      run: dotnet build --no-restore --configuration CLOUD.GIT
-    - name: Test
-      run: dotnet test --no-build --verbosity normal --configuration CLOUD.GIT
+      - uses: actions/checkout@v3
+  
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 6.0.x
+  
+      - name: Restore dependencies
+        run: |
+          dotnet restore
+          echo -e "${{env.GREEN}}  Restoring was successful ${{env.RESET}}"
+  
+      - name: Build
+        run: |
+          dotnet build --no-restore --configuration ${{env.BUILD_CONFIG}}
+          echo -e "${{env.GREEN}}Building was successful ${{env.RESET}}"
+      
+      - name: Test
+        run: dotnet test --no-build --verbosity normal --configuration ${{env.BUILD_CONFIG}}
