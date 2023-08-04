@@ -12,10 +12,10 @@ env:
   PROJECT_PATH : 'RequestSDK/RequestSDK.csproj'
   PACKAGE_OUTPUT_DIRECTORY : ${{github.workspace}}/PackagePath
   NUGET_PACK_URL : 'https://nuget.pkg.github.com/${{ github.actor }}/index.json'
-  LIGHT_GREEN: '\033[92m'
-  GREEN: '\033[32m'
-  RESET: '\033[0m'
-
+  LIGHT_GREEN : '\033[92m'
+  GREEN : '\033[32m'
+  RESET : '\033[0m'
+  ERROR : '\033[31m'
 jobs:
   deploy_package:
     runs-on: ubuntu-latest
@@ -44,6 +44,16 @@ jobs:
           echo -e "${{env.GREEN}}Packing was successful ${{env.RESET}}"
       
       - name: Push Package
+        id: pushing
         run: |
           dotnet nuget push ${{env.PACKAGE_OUTPUT_DIRECTORY}}/*.nupkg --source ${{env.NUGET_PACK_URL}} --api-key ${{secrets.NUGET_PACKAGE_TOKEN}}
           echo -e "${{env.GREEN}}Package Pushing was successful ${{env.RESET}}"
+        continue-on-error: true
+      - name: Check on failures
+        env:
+          COLOR : ${{ steps.pushing.outcome == 'failure' && env.ERROR || env.GREEN }}
+          MESSAGE : ${{ steps.pushing.outcome == 'failure' && 'Check Package Version' || 'No errors found' }}
+        if: steps.pushing.outcome == 'failure'
+        run: |
+          echo -e "${{env.COLOR}}$MESSAGE${{env.RESET}}"
+          if ${{steps.pushing.outcome == 'failure'}}; then exit 1
