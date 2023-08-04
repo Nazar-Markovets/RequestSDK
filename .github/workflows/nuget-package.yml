@@ -39,11 +39,11 @@ jobs:
       
       - name: Pack Project
         run: |
-          echo -e "${{env.LIGHT_GREEN}} Packing version:${{env.RESET}} $GREEN '${{github.event.inputs.version}}' $RESET"
+          echo -e "${{env.LIGHT_GREEN}}Packing version:${{env.RESET}} $GREEN '${{github.event.inputs.version}}' $RESET"
           dotnet pack ${{env.PROJECT_PATH}} --no-restore --no-build --configuration ${{env.BUILD_CONFIG}} -p:PackageVersion=${{github.event.inputs.version}} --output ${{env.PACKAGE_OUTPUT_DIRECTORY}}
-          echo -e "${{env.GREEN}} Packing was successful ${{env.RESET}}"
+          echo -e "${{env.GREEN}}Packing was successful ${{env.RESET}}"
       
       - name: Push Package
         run: |
           dotnet nuget push ${{env.PACKAGE_OUTPUT_DIRECTORY}}/*.nupkg --source ${{env.NUGET_PACK_URL}} --api-key ${{secrets.NUGET_PACKAGE_TOKEN}}
-          echo -e "${{env.GREEN}} Package Pushing was successful ${{env.RESET}}"
+          echo -e "${{env.GREEN}}Package Pushing was successful ${{env.RESET}}"
