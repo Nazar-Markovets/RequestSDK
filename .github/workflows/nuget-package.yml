@@ -4,56 +4,130 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Nuget Version'
-        required: true
-
+        description: 'Package Version'
+        type: number
+        required: false
+      autodetect: 
+        description: 'Set Version automatically'
+        required:  true
+        default: 'yes'
+        type: choice
+        options: 
+          - 'yes'
+          - 'no'
 env:
   BUILD_CONFIG : 'Release'
   PROJECT_PATH : 'RequestSDK/RequestSDK.csproj'
   PACKAGE_OUTPUT_DIRECTORY : ${{github.workspace}}/PackagePath
-  NUGET_PACK_URL : 'https://nuget.pkg.github.com/${{ github.actor }}/index.json'
+  DEPLOY_URL : 'https://nuget.pkg.github.com/${{ github.actor }}/index.json'
+  PACKAGES_URL : 'https://api.github.com/user/packages/nuget/requestsdk/versions'
+  AUTO_DETECT_VERSION : ${{ github.event.inputs.autodetect == 'yes' && true || false }}
   LIGHT_GREEN : '\033[92m'
   GREEN : '\033[32m'
   RESET : '\033[0m'
   ERROR : '\033[31m'
+  WARNING : '\033[33m'
 jobs:
   deploy_package:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Validate selected package version
+        id: version_validation
+        run: |
+          # Regular expression pattern to validate "0.0.0" format
+          echo "${{ github.event.inputs.autodetect }}"
+          pattern="^[0-9]+\.[0-9]+\.[0-9]+$"
+          if [[ '${{github.event.inputs.version}}' =~ $pattern ]]; then
+            echo -e "${{env.GREEN}}Format is valid. Let's look if there're any conflicts...${{env.RESET}}"
+            echo "version-valid=true" >> $GITHUB_OUTPUT
+            echo "version-empty=false" >> $GITHUB_OUTPUT
+          elif [[ '${{github.event.inputs.version}}' == '' ]] && [[ ${{env.AUTO_DETECT_VERSION}} == true ]]; then
+            echo -e "${{env.WARNING}}Detected empty version. Autodetected version will be used insted.${{env.RESET}}"
+            echo "version-valid=false" >> $GITHUB_OUTPUT
+            echo "version-empty=true" >> $GITHUB_OUTPUT
+          elif [[ '${{github.event.inputs.version}}' == '' ]] && [[ ${{env.AUTO_DETECT_VERSION}} == false ]]; then
+            echo -e "${{env.ERROR}}Detected empty version. Autodetected version can't be used.${{env.RESET}}"
+            exit 1
+          elif [[ ${{env.AUTO_DETECT_VERSION}} == true ]]; then
+            echo -e "${{env.WARNING}}Format of version '${{github.event.inputs.version}}' is not valid. Autodetected version will be used insted.${{env.RESET}}"
+            echo "version-valid=false" >> $GITHUB_OUTPUT
+            echo "version-empty=false" >> $GITHUB_OUTPUT
+          else
+            echo -e "${{env.ERROR}}Format of version '${{github.event.inputs.version}}' is not valid. Autodetected version can't be used.${{env.RESET}}"
+            exit 1
+          fi
+
       - uses: actions/checkout@v3
+      - name: Scan deployed packages for available version conflicts
+        id: scan_versions
+        run: |
+          sudo apt-get install jq
+          response=$(curl --silent -H "Authorization: Bearer ${{ secrets.NUGET_PACKAGE_TOKEN }}" "${{env.PACKAGES_URL}}")
+          versions=$(echo "$response" | jq .[].name)
+          last_version=$(echo "$versions" | tr -d '"' | sort -V | tail -n 1)
+
+          echo -e "${{env.GREEN}}Found Versions:${{env.RESET}}"
+          echo "$versions"
+          echo -e "${{env.GREEN}}Autodetect Verions:${{env.RESET}} ${{format('{0}{1}{2}', env.AUTO_DETECT_VERSION == 'true' && env.GREEN || env.ERROR, env.AUTO_DETECT_VERSION, env.RESET)}}"
           
+          if [[ ${{ steps.version_validation.outputs.version-valid }} == false ]] || [[ $versions == *"${{github.event.inputs.version}}"* ]]; then
+            if [[ ${{ steps.version_validation.outputs.version-empty }} == true ]]; then
+              echo -e "${{env.WARNING}}Package with empty version can't be used.${{env.RESET}}"
+            else
+              echo -e "${{env.WARNING}}Package with version '${{github.event.inputs.version}}' can't be used.${{env.RESET}}"
+            fi
+            
+            if [[ ${{env.AUTO_DETECT_VERSION}} == true ]]; then
+                echo -e "${{env.GREEN}}Searching for suitable version...${{env.RESET}}"
+                echo -e "${{env.LIGHT_GREEN}}Last Package Version: '$last_version' ${{env.RESET}}"
+                IFS='.' read -r -a version_parts <<< "$last_version"
+                ((version_parts[2]++))
+                # 1.9.9 -> 1.9.10
+                new_patch_version="${version_parts[0]}.${version_parts[1]}.${version_parts[2]}"
+                
+                echo -e "${{env.GREEN}}Package with version '$new_patch_version' will be used instead of given version' ${{env.RESET}}"
+                echo "PACKAGE_VERSION=$new_patch_version" >> $GITHUB_ENV
+            else
+              echo -e "${{env.ERROR}}Versions conflict can't be resloved. Change 'Version' or choose 'Set Version automatically -> yes'${{env.RESET}}"
+              exit 1
+            fi
+          else
+            echo -e "${{env.LIGHT_GREEN}}Package with version '${{github.event.inputs.version}}' has no conflicts${{env.RESET}}"
+            echo "PACKAGE_VERSION=${{github.event.inputs.version}}" >> $GITHUB_ENV
+          fi
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: 6.0.x
+
       - name: Restore dependencies
         run: |
           dotnet restore ${{env.PROJECT_PATH}}
           echo -e "${{env.GREEN}}  Restoring was successful ${{env.RESET}}"
-    
+
       - name: Build
         run: |
           dotnet build ${{env.PROJECT_PATH}} --no-restore --configuration ${{env.BUILD_CONFIG}}
           echo -e "${{env.GREEN}}Building was successful ${{env.RESET}}"
-      
+
       - name: Pack Project
         run: |
-          echo -e "${{env.LIGHT_GREEN}}Packing version:${{env.RESET}} $GREEN '${{github.event.inputs.version}}' $RESET"
-          dotnet pack ${{env.PROJECT_PATH}} --no-restore --no-build --configuration ${{env.BUILD_CONFIG}} -p:PackageVersion=${{github.event.inputs.version}} --output ${{env.PACKAGE_OUTPUT_DIRECTORY}}
+          echo -e "${{env.LIGHT_GREEN}}Packing version:${{env.RESET}} $GREEN '${{env.PACKAGE_VERSION}}' $RESET"
+          dotnet pack ${{env.PROJECT_PATH}} --no-restore --no-build --configuration ${{env.BUILD_CONFIG}} -p:PackageVersion=${{env.PACKAGE_VERSION}} --output ${{env.PACKAGE_OUTPUT_DIRECTORY}}
           echo -e "${{env.GREEN}}Packing was successful ${{env.RESET}}"
-      
+
       - name: Push Package
         id: pushing
-        run: |
-          dotnet nuget push ${{env.PACKAGE_OUTPUT_DIRECTORY}}/*.nupkg --source ${{env.NUGET_PACK_URL}} --api-key ${{secrets.NUGET_PACKAGE_TOKEN}}
-          echo -e "${{env.GREEN}}Package Pushing was successful ${{env.RESET}}"
         continue-on-error: true
+        run: |
+          dotnet nuget push ${{env.PACKAGE_OUTPUT_DIRECTORY}}/*.nupkg --source ${{env.DEPLOY_URL}} --api-key ${{secrets.NUGET_PACKAGE_TOKEN}}
+          echo -e "${{env.GREEN}}Package Pushing was successful ${{env.RESET}}"
+
       - name: Check on failures
         env:
           COLOR : ${{ steps.pushing.outcome == 'failure' && env.ERROR || env.GREEN }}
-          MESSAGE : ${{ steps.pushing.outcome == 'failure' && 'Check Package Version' || 'No errors found' }}
-        if: steps.pushing.outcome == 'failure'
+          MESSAGE : ${{ steps.pushing.outcome == 'failure' && 'Unhandeled exception. Package can not be pushed.' || 'No errors found.' }}
         run: |
-          echo -e "${{env.COLOR}}$MESSAGE${{env.RESET}}"
-          if ${{steps.pushing.outcome == 'failure'}}; then exit 1
+          echo -e "${{format('{0}{1} Version: {2}{3}', env.COLOR, env.MESSAGE, env.PACKAGE_VERSION, env.RESET)}}"
