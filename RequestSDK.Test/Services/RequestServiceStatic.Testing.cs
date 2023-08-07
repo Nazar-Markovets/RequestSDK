@@ -85,7 +85,7 @@ namespace RequestSDK.Test.Services
         }
 
 
-        [Fact(DisplayName = $"Static. {nameof(RequestService.Base64Encode)}. Object")]
+        [Fact(DisplayName = $"Static. {nameof(RequestService.Base64EncodeObject)}. Object")]
         public void Request_Base64Encode_Object()
         {
             TestDecodeClass originalObject = new();
@@ -95,7 +95,7 @@ namespace RequestSDK.Test.Services
             Assert.NotEqual(encodedJson, json);
         }
 
-        [Fact(DisplayName = $"Static. {nameof(RequestService.Base64Decode)}. Object")]
+        [Fact(DisplayName = $"Static. {nameof(RequestService.Base64DecodeObject)}. Object")]
         public void Request_Base64Decode_Object()
         {
             TestDecodeClass expectedObjecct = new() { Id = 21579, Identifier = new Guid("0cd7a13e-38dd-4151-81cc-9447f8c6bafa"), Male = true, Name = "TestName" };
@@ -205,6 +205,144 @@ namespace RequestSDK.Test.Services
         }
 
 
-        # endregion BasePath
+        #endregion BasePath
+
+        #region Combine Query Parameters
+
+        private const string EmptyValue = "";
+        private const string IgnoreWord = "ignore_parameters";
+
+        [Theory(DisplayName = $"Static. {nameof(RequestService.CombineQueryParameters)}. Ignore Empty")]
+        [InlineData(true, IgnoreWord, EmptyValue)]
+        [InlineData(true, EmptyValue, "value")]
+        [InlineData(true, EmptyValue, EmptyValue)]
+        [InlineData(true, "with_value", "value")]
+        [InlineData(true, "with_empty_value", EmptyValue)]
+
+        [InlineData(false, IgnoreWord, EmptyValue)]
+        [InlineData(false, EmptyValue, "value1")]
+        [InlineData(false, EmptyValue, EmptyValue)]
+        [InlineData(false, "with_value", "value")]
+        [InlineData(false, "with_empty_value", EmptyValue)]
+        public void Request_CombineQueryParameters_IgnoreEmpty(bool ignoreEmptyParameters, string requestParameterKey, string requestParameterValue)
+        {
+            string? queryParameters = null;
+            KeyValuePair<string, string?>[] array = 
+            { 
+                RequestService.RequestParameter(requestParameterKey, requestParameterValue), 
+                RequestService.RequestParameter("name", "john") 
+            };
+            Assert.Null(Record.Exception(() =>
+            {
+                return queryParameters = requestParameterKey.Equals(IgnoreWord)
+                                         ? RequestService.CombineQueryParameters(ignoreEmptyParameters)
+                                         : RequestService.CombineQueryParameters(ignoreEmptyParameters, array);
+            }));
+
+            TestContole.WriteLine(string.IsNullOrEmpty(queryParameters) ? "Result : Empty String" : $"Result : {queryParameters}");
+
+            switch (requestParameterKey)
+            {
+                case IgnoreWord: Assert.Equal(string.Empty, queryParameters); break;
+                case "with_value": Assert.Equal("with_value=value&name=john", queryParameters); break;
+                case "with_empty_value" when ignoreEmptyParameters is false: Assert.Equal("with_empty_value=&name=john", queryParameters); break;
+                default: Assert.Equal("name=john", queryParameters ?? "NULL" ); break;
+            }
+        }
+
+        [Theory(DisplayName = $"Static. {nameof(RequestService.CombineQueryParameters)}. Same Duplicates")]
+        [InlineData(true, EmptyValue, "value")]
+        [InlineData(true, EmptyValue, EmptyValue)]
+        [InlineData(true, "with_value", "value")]
+        [InlineData(true, "with_empty_value", EmptyValue)]
+        
+        [InlineData(false, EmptyValue, "value")]
+        [InlineData(false, EmptyValue, EmptyValue)]
+        [InlineData(false, "with_value", "value")]
+        [InlineData(false, "with_empty_value", EmptyValue)]
+        public void Request_CombineQueryParameters_Duplicates(bool ignoreEmptyParameters, string requestParameterKey, string requestParameterValue)
+        {
+            string? queryParameters = default;
+            KeyValuePair<string, string?>[] array = 
+            { 
+                RequestService.RequestParameter(requestParameterKey, requestParameterValue), 
+                RequestService.RequestParameter(requestParameterKey, requestParameterValue) 
+            };
+            Assert.Null(Record.Exception(() => queryParameters = RequestService.CombineQueryParameters(ignoreEmptyParameters, array)));
+            TestContole.WriteLine(string.IsNullOrEmpty(queryParameters) ? "Result : Empty String" : $"Result : {queryParameters}");
+
+            switch (requestParameterKey)
+            {
+                case "with_value": Assert.Equal("with_value=value", queryParameters); break;
+                case "with_empty_value" when ignoreEmptyParameters is false: Assert.Equal("with_empty_value=", queryParameters); break;
+                default: Assert.Equal(string.Empty, queryParameters ?? "NULL"); break;
+            }
+        }
+
+        [Theory(DisplayName = $"Static. {nameof(RequestService.CombineQueryParameters)}. Pair Duplicates")]
+        [InlineData(true, EmptyValue, "value")]
+        [InlineData(true, EmptyValue, EmptyValue)]
+        [InlineData(true, "with_value", "value")]
+        [InlineData(true, "with_empty_value", EmptyValue)]
+
+        [InlineData(false, EmptyValue, "value")]
+        [InlineData(false, EmptyValue, EmptyValue)]
+        [InlineData(false, "with_value", "value")]
+        [InlineData(false, "with_empty_value", EmptyValue)]
+        public void Request_CombineQueryParameters_Pair_Duplicates(bool ignoreEmptyParameters, string requestParameterKey, string requestParameterValue)
+        {
+            string? queryParameters = default;
+            KeyValuePair<string, string?>[] array =
+            {
+                RequestService.RequestParameter(requestParameterKey, requestParameterValue),
+                RequestService.RequestParameter(requestParameterKey, requestParameterValue),
+                RequestService.RequestParameter("name", "john"),
+                RequestService.RequestParameter("name", "john"),
+            };
+            Assert.Null(Record.Exception(() => queryParameters = RequestService.CombineQueryParameters(ignoreEmptyParameters, array)));
+            TestContole.WriteLine(string.IsNullOrEmpty(queryParameters) ? "Result : Empty String" : $"Result : {queryParameters}");
+
+            switch (requestParameterKey)
+            {
+                case "with_value": Assert.Equal("with_value=value&name=john", queryParameters); break;
+                case "with_empty_value" when ignoreEmptyParameters is false: Assert.Equal("with_empty_value=&name=john", queryParameters); break;
+                default: Assert.Equal("name=john", queryParameters ?? "NULL"); break;
+            }
+        }
+
+        [Theory(DisplayName = $"Static. {nameof(RequestService.CombineQueryParameters)}. Different Duplicates")]
+        [InlineData(true, EmptyValue, "value")]
+        [InlineData(true, EmptyValue, EmptyValue)]
+        [InlineData(true, "with_value", "value")]
+        [InlineData(true, "with_empty_value", EmptyValue)]
+
+        [InlineData(false, EmptyValue, "value")]
+        [InlineData(false, EmptyValue, EmptyValue)]
+        [InlineData(false, "with_value", "value")]
+        [InlineData(false, "with_empty_value", EmptyValue)]
+        public void Request_CombineQueryParameters_Different_Duplicates(bool ignoreEmptyParameters, string requestParameterKey, string requestParameterValue)
+        {
+            string? queryParameters = default;
+            KeyValuePair<string, string?>[] array =
+            {
+                RequestService.RequestParameter(requestParameterKey, requestParameterValue),
+                RequestService.RequestParameter(requestParameterKey, "duplicateKeyValue"),
+                RequestService.RequestParameter("name", "john"),
+                RequestService.RequestParameter("name", "maria"),
+            };
+            Assert.Null(Record.Exception(() => queryParameters = RequestService.CombineQueryParameters(ignoreEmptyParameters, array)));
+            TestContole.WriteLine(string.IsNullOrEmpty(queryParameters) ? "Result : Empty String" : $"Result : {queryParameters}");
+
+            switch (requestParameterKey)
+            {
+                case "with_value": Assert.Equal("with_value=value,duplicateKeyValue&name=john,maria", queryParameters); break;
+                case "with_empty_value": Assert.Equal("with_empty_value=duplicateKeyValue&name=john,maria", queryParameters); break;
+                case null: Assert.Equal("name=john,maria", queryParameters ?? "NULL"); break;
+                case EmptyValue: Assert.Equal("name=john,maria", queryParameters ?? "NULL"); break;
+            }
+        }
+
+        #endregion Combine Query Parameters
+
     }
 }

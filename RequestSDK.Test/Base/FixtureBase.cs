@@ -7,13 +7,13 @@ namespace RequestSDK.Test.Base;
 public class FixtureBase : IClassFixture<ServerInstanceRunner>
 {
     protected readonly ServerInstanceRunner serverInstance;
-    protected readonly ITestOutputHelper console;
+    protected readonly ITestOutputHelper TestContole;
     protected bool ServerIsStarted => serverInstance.IsAlive;
     protected int ServerPort = 5100;
     protected Uri ServerBaseUrl => new(serverInstance.BaseUrl);
     public FixtureBase(ITestOutputHelper consoleWriter, ServerInstanceRunner server)
     {
-        console = consoleWriter;
+        TestContole = consoleWriter;
         serverInstance = server;
     }
 

@@ -199,11 +199,10 @@ public partial class RequestService
                 if (ignoreEmpty && string.IsNullOrWhiteSpace(queryParameters[i].Value)) continue;
                 queryString.Add(queryParameters[i].Key, queryParameters[i].Value);
             }
-            return string.Join('&', queryString.AllKeys.Select(key => $"{key}={queryString[key]}"));
+            return string.Join('&', queryString.AllKeys.Select(key => $"{key}={string.Join(',', queryString.GetValues(key)?.Distinct().Where(value => !string.IsNullOrEmpty(value)) ?? Array.Empty<string>())}"));
         }
         return string.Empty;
     }
-
 
     public static Dictionary<string, string?> GetQueryParameters(Uri uri) => GetQueryParameters(uri.Query);
 
