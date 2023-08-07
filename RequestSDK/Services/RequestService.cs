@@ -51,7 +51,7 @@ public partial class RequestService
             _cache = new MemoryCache(new MemoryCacheOptions());
             _routingInfo = GetCachedMetadata();
         }
-        _instances = requestServiceOptions.Clients?.ToDictionary(kv => kv.HttpClientId, kv => kv);
+        _instances = requestServiceOptions.HttpClientSettings?.ToDictionary(kv => kv.HttpClientId, kv => kv);
     }
 
     #region Sending Request

@@ -17,49 +17,57 @@ public partial class RequestService_Testing : FixtureBase
     {
     }
 
-    [Fact(DisplayName = "Creating Request with registered clients")]
+    
+
+
+    [Fact(DisplayName = "Create Request. Registered Client. Empty client base path")]
     public async Task RequestOptions_Initialization()
     {
-        HttpResponseMessage responseMessage = new(HttpStatusCode.OK) { Content = new StringContent("Mocked response") };
+        HttpResponseMessage responseMessage = MockHelper.GenerateResponseMessage(HttpStatusCode.OK, ResponseContent);
 
-        Mock<IHttpClientFactory> clientsFactory = new();
-        Mock<HttpMessageHandler> mockHttpMessageHandler = new();
-        
-        mockHttpMessageHandler.Protected()
-                              .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
-                              .ReturnsAsync(responseMessage);
-
-
-        HttpClient registeredHttpClient = new(mockHttpMessageHandler.Object);
-
-        clientsFactory.Setup(x => x.CreateClient("TestAPI")).Returns(registeredHttpClient);
+        RequestService.HttpClientSettings httpClientSettings = new() { HttpClientId = 1, HttpClientName = TargetClientId };
+        HttpClient httpClient = MockHelper.CreateOfflineHttpClient(responseMessage);
+        IHttpClientFactory factory = MockHelper.CreateOfflineFactory(httpClient, httpClientSettings);
         RequestService.RequestServiceOptions requestOptions = new()
         {
-            Factory = clientsFactory.Object,
-            Clients = new List<RequestService.HttpClientSettings>()
-            {
-                new RequestService.HttpClientSettings(){ HttpClientId = 1, HttpClientName = "TestAPI" }
-            }
+            Factory = factory,
+            HttpClientSettings = new List<RequestService.HttpClientSettings>(){ httpClientSettings }
         };
 
         RequestService requestService = new(requestOptions);
-        HttpResponseMessage response = await requestService.ExecuteRequestAsync(new RequestService.Options(HttpMethod.Get, "https://example.com", 1), httpContent: new StringContent("Request content"));
+        HttpResponseMessage response = await requestService.ExecuteRequestAsync(
+                                             new RequestService.Options(HttpMethod.Get, RequestURL, httpClientSettings.HttpClientId), 
+                                             httpContent: new StringContent("Request content"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         string content = await response.Content.ReadAsStringAsync();
-        Assert.Equal("Mocked response", content);
+        Assert.Equal(ResponseContent, content);
 
     }
 
-    [SkippableFact(DisplayName = "Creating Variable")]
+    [SkippableFact(DisplayName = "Create Request. Registered Client. Not empty client base path")]
     public async Task HttpClientSettings_Initialization()
     {
-        RunAPI();
-        RequestService requestService = new ();
-        HttpResponseMessage response = await requestService.ExecuteRequestAsync(new RequestService.Options(HttpMethod.Get, GenerateRequestRoute("status/service_status")));
+        HttpResponseMessage responseMessage = MockHelper.GenerateResponseMessage(HttpStatusCode.OK, ResponseContent);
+        RequestService.HttpClientSettings httpClientSettings = new() { HttpClientId = 1, HttpClientName = TargetClientId };
+        HttpClient httpClient = MockHelper.CreateOfflineHttpClient(responseMessage, RequestURL, sendRequestChecks: (response) =>
+        {
+            Assert.Same(HttpMethod.Get, response.Method);
+            Assert.Equal(RequestControllerUri, response.RequestUri);
+        });
+        IHttpClientFactory factory = MockHelper.CreateOfflineFactory(httpClient, httpClientSettings);
+        RequestService.RequestServiceOptions requestOptions = new()
+        {
+            Factory = factory,
+            HttpClientSettings = new List<RequestService.HttpClientSettings>() { httpClientSettings }
+        };
+
+        RequestService requestService = new(requestOptions);
+        HttpResponseMessage response = await requestService.ExecuteRequestAsync(new RequestService.Options(HttpMethod.Get, "controller/action", 1), httpContent: new StringContent("Request content"));
+
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         string content = await response.Content.ReadAsStringAsync();
-        Assert.Equal("API is ready", content);
+        Assert.Equal(ResponseContent, content);
     }
 }
 

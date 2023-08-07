@@ -7,7 +7,7 @@ public partial class RequestService
     public sealed class RequestServiceOptions
     {
         public IHttpClientFactory? Factory { get; init; }
-        public IEnumerable<HttpClientSettings>? Clients { get; init; }
+        public IEnumerable<HttpClientSettings>? HttpClientSettings { get; init; }
         public Type? AccemblyRoutingType { get; init; }
         public Func<AuthenticationHeaderValue>? Authentication { get; init; }
     }

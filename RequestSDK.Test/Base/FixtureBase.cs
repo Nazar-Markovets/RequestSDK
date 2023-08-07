@@ -1,16 +1,27 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+
 using RequestSDK.Test.Integration;
+
 using Xunit.Abstractions;
 
 namespace RequestSDK.Test.Base;
 
-public class FixtureBase : IClassFixture<ServerInstanceRunner>
+public partial class FixtureBase : IClassFixture<ServerInstanceRunner>
 {
     protected readonly ServerInstanceRunner serverInstance;
     protected readonly ITestOutputHelper TestContole;
     protected bool ServerIsStarted => serverInstance.IsAlive;
     protected int ServerPort = 5100;
     protected Uri ServerBaseUrl => new(serverInstance.BaseUrl);
+    protected MockRequestHelper MockHelper = new();
+
+    protected readonly string RequestURL = "https://example.com";
+    protected readonly string RequestControllerURL = "https://example.com/controller/action";
+    protected readonly string TargetClientId = "Mock.Client.ID";
+    protected readonly string ResponseContent = "Mocked HTTP response content";
+    protected readonly Uri RequestControllerUri = new("https://example.com/controller/action");
+
+
     public FixtureBase(ITestOutputHelper consoleWriter, ServerInstanceRunner server)
     {
         TestContole = consoleWriter;
