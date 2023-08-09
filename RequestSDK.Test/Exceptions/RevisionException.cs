@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace RequestSDK.Test.Exceptions
 {
-    internal sealed class RevisionException : Exception
+    internal sealed class NotSupportedException : Exception
     {
-        public RevisionException(string exception) : base("\n" + exception) 
+        public NotSupportedException(string exception) : base(exception) 
         {
 
         }

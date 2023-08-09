@@ -1,5 +1,7 @@
 ﻿using System.Net.Http.Headers;
 using System.Net.Mime;
+using System.Xml.Linq;
+using System.Linq;
 
 namespace RequestSDK.Services;
 
@@ -74,12 +76,39 @@ public partial class RequestService
             return this;
         }
 
-        public Options AddHeader(string name, string value)
+        public Options AddHeader(string name, params string?[] value)
         {
-            if(string.IsNullOrWhiteSpace(name)) throw new ArgumentNullException("Header Key can't be null or empty");
-            CustomHeaders ??= new Dictionary<string, string?>();
-            CustomHeaders.Add(name, value);
+            KeyValuePair<string, string> header = RequestHeader(name, value);
+            if (IsValidHeader(header!))
+            {
+                CustomHeaders ??= new Dictionary<string, string?>();
+                CustomHeaders.Add(header.Key, header.Value);
+            }
+
             return this;
         }
+
+        public Options AddHeader(KeyValuePair<string, string?> header)
+        {
+            if (IsValidHeader(header))
+            {
+                CustomHeaders ??= new Dictionary<string, string?>();
+                CustomHeaders.Add(header.Key, header.Value);
+            }
+
+            return this;
+        }
+
+        public Options AddHeaders(params KeyValuePair<string, string?>[] headers)
+        {
+            CustomHeaders ??= new Dictionary<string, string?>(headers.Length);
+            
+            foreach (var header in headers.Where(header => IsValidHeader(header))) 
+                CustomHeaders.Add(header.Key, header.Value);
+
+            return this;
+        }
+
+        private bool IsValidHeader(KeyValuePair<string, string?> header) => !string.IsNullOrWhiteSpace(header.Key) && !string.IsNullOrWhiteSpace(header.Value);
     }
 }

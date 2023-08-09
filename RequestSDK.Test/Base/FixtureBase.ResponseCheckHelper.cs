@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using Microsoft.AspNetCore.Http;
 using System.Net.Http.Json;
+using RequestSDK.Services;
 
 namespace RequestSDK.Test.Base;
 
@@ -17,23 +18,26 @@ public partial class FixtureBase
 
         public ResponseCheckHelper CheckResponseStatusCode(HttpStatusCode statusCode)
         {
-            AsParallel(() => Assert.Equal(statusCode, _responseMessage.StatusCode));
+            AsParallelSync(() => Assert.Equal(statusCode, _responseMessage.StatusCode));
             return this;
         }
 
         public ResponseCheckHelper CheckResponseContent<T>(T expectedContent)
         {
-            AsParallel(async () =>
+            AsParallelAsync(async () =>
             {
-                if (MockRequestHelper.IsPrimitiveType(expectedContent))
-                {
-                    string content = await _responseMessage.Content.ReadAsStringAsync();
-                    Assert.Equal(expectedContent?.ToString(), content);
-                }
-                else
+                bool? mustBeJson = RequestService.MustBeSendAsJson(expectedContent);
+                if (mustBeJson.HasValue is false) Assert.Fail("Expected content is null");
+
+                if (mustBeJson.Value)
                 {
                     T? content = await _responseMessage.Content.ReadFromJsonAsync<T>();
                     Assert.Equal(expectedContent, content);
+                }
+                else
+                {
+                    string content = await _responseMessage.Content.ReadAsStringAsync();
+                    Assert.Equal(expectedContent?.ToString(), content);
                 }
             });
             return this;

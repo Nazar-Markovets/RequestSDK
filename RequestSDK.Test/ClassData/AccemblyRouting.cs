@@ -2,7 +2,7 @@
 
 namespace RequestSDK.Test.ClassData;
 
-public class AccemblyRouting
+public sealed class AccemblyRouting
 {
 
     [ControllerName("Action")]

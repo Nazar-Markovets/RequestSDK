@@ -144,7 +144,7 @@ namespace RequestSDK.Test.Services
         [Fact(DisplayName = $"Static. {nameof(RequestService.RequestParameter)}. Empty")]
         public void Request_RequestParameter_Empty()
         {
-            KeyValuePair<string, string?> parameter = default;
+            KeyValuePair<string, string> parameter = default;
             Assert.Null(Record.Exception(() => parameter = RequestService.RequestParameter(string.Empty, string.Empty)));
             Assert.Equivalent(new KeyValuePair<string, string>(string.Empty, string.Empty), parameter);
         }
@@ -152,7 +152,7 @@ namespace RequestSDK.Test.Services
         [Fact(DisplayName = $"Static. {nameof(RequestService.RequestParameter)}. Both Null")]
         public void Request_RequestParameter_Null()
         {
-            KeyValuePair<string, string?> parameter = default;
+            KeyValuePair<string, string> parameter = default;
             Assert.Null(Record.Exception(() => parameter = RequestService.RequestParameter(null, null)));
             Assert.Equivalent(new KeyValuePair<string, string>(string.Empty, string.Empty), parameter);
         }
@@ -160,7 +160,7 @@ namespace RequestSDK.Test.Services
         [Fact(DisplayName = $"Static. {nameof(RequestService.RequestParameter)}. Value Null")]
         public void Request_RequestParameter_ValueNull()
         {
-            KeyValuePair<string, string?> parameter = default;
+            KeyValuePair<string, string> parameter = default;
             Assert.Null(Record.Exception(() => parameter = RequestService.RequestParameter("Key", null)));
             Assert.Equivalent(new KeyValuePair<string, string>("Key", string.Empty), parameter);
         }
@@ -227,7 +227,7 @@ namespace RequestSDK.Test.Services
         public void Request_CombineQueryParameters_IgnoreEmpty(bool ignoreEmptyParameters, string requestParameterKey, string requestParameterValue)
         {
             string? queryParameters = null;
-            KeyValuePair<string, string?>[] array = 
+            KeyValuePair<string, string>[] array = 
             { 
                 RequestService.RequestParameter(requestParameterKey, requestParameterValue), 
                 RequestService.RequestParameter("name", "john") 
@@ -236,7 +236,7 @@ namespace RequestSDK.Test.Services
             {
                 return queryParameters = requestParameterKey.Equals(IgnoreWord)
                                          ? RequestService.CombineQueryParameters(ignoreEmptyParameters)
-                                         : RequestService.CombineQueryParameters(ignoreEmptyParameters, array);
+                                         : RequestService.CombineQueryParameters(ignoreEmptyParameters, array!);
             }));
 
             TestContole.WriteLine(string.IsNullOrEmpty(queryParameters) ? "Result : Empty String" : $"Result : {queryParameters}");
@@ -263,12 +263,12 @@ namespace RequestSDK.Test.Services
         public void Request_CombineQueryParameters_Duplicates(bool ignoreEmptyParameters, string requestParameterKey, string requestParameterValue)
         {
             string? queryParameters = default;
-            KeyValuePair<string, string?>[] array = 
+            KeyValuePair<string, string>[] array = 
             { 
                 RequestService.RequestParameter(requestParameterKey, requestParameterValue), 
                 RequestService.RequestParameter(requestParameterKey, requestParameterValue) 
             };
-            Assert.Null(Record.Exception(() => queryParameters = RequestService.CombineQueryParameters(ignoreEmptyParameters, array)));
+            Assert.Null(Record.Exception(() => queryParameters = RequestService.CombineQueryParameters(ignoreEmptyParameters, array!)));
             TestContole.WriteLine(string.IsNullOrEmpty(queryParameters) ? "Result : Empty String" : $"Result : {queryParameters}");
 
             switch (requestParameterKey)
@@ -292,14 +292,14 @@ namespace RequestSDK.Test.Services
         public void Request_CombineQueryParameters_Pair_Duplicates(bool ignoreEmptyParameters, string requestParameterKey, string requestParameterValue)
         {
             string? queryParameters = default;
-            KeyValuePair<string, string?>[] array =
+            KeyValuePair<string, string>[] array =
             {
                 RequestService.RequestParameter(requestParameterKey, requestParameterValue),
                 RequestService.RequestParameter(requestParameterKey, requestParameterValue),
                 RequestService.RequestParameter("name", "john"),
                 RequestService.RequestParameter("name", "john"),
             };
-            Assert.Null(Record.Exception(() => queryParameters = RequestService.CombineQueryParameters(ignoreEmptyParameters, array)));
+            Assert.Null(Record.Exception(() => queryParameters = RequestService.CombineQueryParameters(ignoreEmptyParameters, array!)));
             TestContole.WriteLine(string.IsNullOrEmpty(queryParameters) ? "Result : Empty String" : $"Result : {queryParameters}");
 
             switch (requestParameterKey)
@@ -323,14 +323,14 @@ namespace RequestSDK.Test.Services
         public void Request_CombineQueryParameters_Different_Duplicates(bool ignoreEmptyParameters, string requestParameterKey, string requestParameterValue)
         {
             string? queryParameters = default;
-            KeyValuePair<string, string?>[] array =
+            KeyValuePair<string, string>[] array =
             {
                 RequestService.RequestParameter(requestParameterKey, requestParameterValue),
                 RequestService.RequestParameter(requestParameterKey, "duplicateKeyValue"),
                 RequestService.RequestParameter("name", "john"),
                 RequestService.RequestParameter("name", "maria"),
             };
-            Assert.Null(Record.Exception(() => queryParameters = RequestService.CombineQueryParameters(ignoreEmptyParameters, array)));
+            Assert.Null(Record.Exception(() => queryParameters = RequestService.CombineQueryParameters(ignoreEmptyParameters, array!)));
             TestContole.WriteLine(string.IsNullOrEmpty(queryParameters) ? "Result : Empty String" : $"Result : {queryParameters}");
 
             switch (requestParameterKey)
@@ -344,5 +344,16 @@ namespace RequestSDK.Test.Services
 
         #endregion Combine Query Parameters
 
+
+        #region Check Primitive Types
+
+        [Theory(DisplayName = $"Static. {nameof(RequestService.MustBeSendAsJson)}.")]
+        [ClassData(typeof(RequestContentTypes))]
+        public void Request_IsPrimitiveContentType(object content, bool mustBeJson)
+        {
+            Assert.Equal(mustBeJson, RequestService.MustBeSendAsJson(content));
+        }
+
+        #endregion Check Primitive Types
     }
 }

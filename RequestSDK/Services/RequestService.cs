@@ -10,6 +10,7 @@ using System.Collections.Specialized;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Web;
 using System.Net.Mime;
+using System.Runtime.CompilerServices;
 
 namespace RequestSDK.Services;
 
@@ -119,16 +120,37 @@ public partial class RequestService
         return httpClient.SendAsync(requestMessage, options.CompletionOption, cancellationToken);
     }
 
-    private static StringContent? GetCorrectHttpContent<T>(T content, JsonSerializerOptions serializerOptions = default!)
+    public static StringContent? GetCorrectHttpContent<T>(T? content, JsonSerializerOptions serializerOptions = default!)
     {
-        Type type = typeof(T);
+        bool? mustBeJson = MustBeSendAsJson(content);
+        if (mustBeJson.HasValue is false) return null;
 
-        bool isStruct = type.IsValueType && !type.IsPrimitive;
-        bool isClass = type.IsClass && !type.Equals(typeof(string));
-
-        return isClass || isStruct
+        return mustBeJson.Value
                ? new StringContent(JsonSerializer.Serialize(content, serializerOptions), Encoding.UTF8, MediaTypeNames.Application.Json)
                : new StringContent(content!.ToString()!);
+    }
+
+    public static bool? MustBeSendAsJson<T>(T content)
+    {
+        if (content is null) return null;
+
+        Type type = content.GetType() ?? typeof(T);
+
+        bool isStruct = type.IsValueType && !type.IsPrimitive;
+        bool isClass = (type.IsClass && !type.Equals(typeof(string))) || IsAnonymousType(type);
+        return isClass || isStruct;
+    }
+
+    private static bool IsAnonymousType(Type type)
+    {
+        if (type == null)
+            throw new ArgumentNullException("Type Can't be null");
+
+        // HACK: The only way to detect anonymous types right now.
+        return Attribute.IsDefined(type, typeof(CompilerGeneratedAttribute), false)
+               && type.IsGenericType && type.Name.Contains("AnonymousType")
+               && (type.Name.StartsWith("<>") || type.Name.StartsWith("VB$"))
+               && type.Attributes.HasFlag(TypeAttributes.NotPublic);
     }
 
     #endregion Sending Request
@@ -205,7 +227,15 @@ public partial class RequestService
 
     #region Static Methods
 
-    public static KeyValuePair<string, string?> RequestParameter(string? key, string? value) => new(key ?? "", value ?? "");
+    public static KeyValuePair<string, string> RequestParameter(string? key, string? value) =>
+        string.IsNullOrWhiteSpace(key)
+        ? new(string.Empty, string.Empty) 
+        : new(key, value ?? string.Empty);
+
+    public static KeyValuePair<string, string> RequestHeader(string? key, params string?[] value) => 
+        string.IsNullOrWhiteSpace(key)
+        ? new(string.Empty, string.Empty)
+        : new(key, string.Join(", ", value?.Where(v => !string.IsNullOrWhiteSpace(v)) ?? Array.Empty<string>()));
 
     public static string CombineQueryParameters(bool ignoreEmpty, params KeyValuePair<string, string?>[] queryParameters)
     {
