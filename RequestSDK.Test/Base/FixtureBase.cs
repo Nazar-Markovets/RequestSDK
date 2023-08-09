@@ -15,11 +15,10 @@ public partial class FixtureBase : IClassFixture<ServerInstanceRunner>
     protected Uri ServerBaseUrl => new(serverInstance.BaseUrl);
     protected MockRequestHelper MockHelper = new();
 
-    protected readonly string RequestURL = "https://example.com";
-    protected readonly string RequestControllerURL = "https://example.com/controller/action";
-    protected readonly string TargetClientId = "Mock.Client.ID";
-    protected readonly string ResponseContent = "Mocked HTTP response content";
-    protected readonly Uri RequestControllerUri = new("https://example.com/controller/action");
+    protected const string ClientBaseURL = "https://example.com";
+    protected const string RequestControllerURL = "https://example.com/controller/action";
+    protected const string TargetClientId = "Mock.Client.ID";
+    protected const string ResponseContent = "Mocked HTTP response content";
 
 
     public FixtureBase(ITestOutputHelper consoleWriter, ServerInstanceRunner server)

@@ -9,6 +9,7 @@ using RequestSDK.Enums;
 using System.Collections.Specialized;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Web;
+using System.Net.Mime;
 
 namespace RequestSDK.Services;
 
@@ -33,25 +34,36 @@ public partial class RequestService
         { HttpRequestMethod.Connect, new HttpMethod("CONNECT") },
         { HttpRequestMethod.Options, HttpMethod.Options },
     };
-    private readonly RequestServiceOptions _setupOptions;
+    private readonly HttpClient _defaultHttpClient;
+    private RequestServiceOptions _serviceOptions = default!;
 
     #endregion Private Fields
 
-    public RequestService()
+    public RequestServiceOptions SetupOptions
     {
-        _setupOptions = new RequestServiceOptions();
+        get => _serviceOptions;
+        init
+        {
+            _serviceOptions = value;
+            if (value.AccemblyRoutingType != null)
+            {
+                _cache = new MemoryCache(new MemoryCacheOptions());
+                _routingInfo = GetCachedMetadata();
+            }
+            _instances = value.HttpClientSettings?.ToDictionary(kv => kv.HttpClientId, kv => kv);
+        }
+    }
+
+    public RequestService(HttpClient httpClient)
+    {
+        _defaultHttpClient = httpClient ?? throw new ArgumentNullException("Given HttpClient can't be null");
+        SetupOptions = new RequestServiceOptions();
     }
 
     public RequestService(RequestServiceOptions requestServiceOptions)
     {
-        _setupOptions = requestServiceOptions ?? throw new ArgumentNullException("Request Service Options can't be null");
-
-        if (requestServiceOptions.AccemblyRoutingType != null)
-        {
-            _cache = new MemoryCache(new MemoryCacheOptions());
-            _routingInfo = GetCachedMetadata();
-        }
-        _instances = requestServiceOptions.HttpClientSettings?.ToDictionary(kv => kv.HttpClientId, kv => kv);
+        SetupOptions = requestServiceOptions ?? throw new ArgumentNullException("Request Service Options can't be null");
+        _defaultHttpClient = new HttpClient();
     }
 
     #region Sending Request
@@ -63,13 +75,13 @@ public partial class RequestService
         MakeRequest(requestOptions, default, cancellationToken);
 
     public Task<HttpResponseMessage> ExecuteRequestAsync<TBody>(Options requestOptions, TBody DTO, JsonSerializerOptions serializerOptions = default!, CancellationToken cancellationToken = default) =>
-        MakeRequest(requestOptions, new StringContent(JsonSerializer.Serialize(DTO, serializerOptions), Encoding.UTF8, requestOptions.ContentType), cancellationToken);
+        MakeRequest(requestOptions, GetCorrectHttpContent(DTO, serializerOptions), cancellationToken);
 
     public Task<HttpResponseMessage> MakeRequest(Options options, HttpContent? content, CancellationToken cancellationToken)
     {
         byte requestedSetting = byte.TryParse(options.HttpClientId?.ToString(), out byte clientId) ? clientId : byte.MinValue;
         HttpClientSettings? registeredSetting = _instances?.ContainsKey(requestedSetting) is true ? _instances![requestedSetting] : default;
-        HttpClient httpClient = _setupOptions.Factory?.CreateClient(registeredSetting?.HttpClientName ?? Microsoft.Extensions.Options.Options.DefaultName) ?? new HttpClient();
+        HttpClient httpClient = SetupOptions.Factory?.CreateClient(registeredSetting?.HttpClientName ?? Microsoft.Extensions.Options.Options.DefaultName) ?? _defaultHttpClient;
         string requestQuery = string.Empty;
 
         //Request Path
@@ -77,16 +89,13 @@ public partial class RequestService
             if (options.UseSdkRouting)
             {
                 var requestMetadata = GetRequestMetadata(options.Path);
-                requestQuery = requestMetadata.RequestPath;
+                options.Path = requestMetadata.RequestPath;
                 options.HttpMethod = requestMetadata.HttpMethod;
             }
-            else
-            {
-                bool useOptionsAsPath = TryUriParse(options.Path, out Uri? optionsPath);
-                string basePath = GetBasePath(httpClient.BaseAddress ?? registeredSetting?.BaseAddress) ?? GetBasePath(optionsPath) ?? throw new Exception("Can't create request uri. Check request options");
-                string? path = useOptionsAsPath ? AppendPathSafely(basePath!, optionsPath!.PathAndQuery) : AppendPathSafely(basePath!, options.Path);
-                requestQuery = QueryHelpers.AddQueryString(path, options.RequestParameters?.ToDictionary(k => k.Key, v => v.Value) ?? new());
-            }
+            bool useOptionsAsPath = TryUriParse(options.Path, out Uri? optionsPath);
+            string basePath = GetBasePath(httpClient.BaseAddress ?? registeredSetting?.BaseAddress) ?? GetBasePath(optionsPath) ?? throw new Exception("Can't create request uri. Check request options");
+            string? path = useOptionsAsPath ? AppendPathSafely(basePath!, optionsPath!.PathAndQuery) : AppendPathSafely(basePath!, options.Path);
+            requestQuery = QueryHelpers.AddQueryString(path, options.RequestParameters?.ToDictionary(k => k.Key, v => v.Value) ?? new());
         }
 
         //Request Options
@@ -95,7 +104,7 @@ public partial class RequestService
             if (options.AcceptTypes is null) httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
             else options.AcceptTypes?.ForEach(acceptType => httpClient.DefaultRequestHeaders.Accept.Add(acceptType));
 
-            AuthenticationHeaderValue? authenticationHeader = options.Authentication ?? _setupOptions.Authentication?.Invoke();
+            AuthenticationHeaderValue? authenticationHeader = options.Authentication ?? SetupOptions.Authentication?.Invoke();
             httpClient.DefaultRequestHeaders.Authorization = authenticationHeader;
 
             options.CustomHeaders?.ToList()?.ForEach(header => httpClient.DefaultRequestHeaders.Add(header.Key, header.Value));
@@ -108,6 +117,18 @@ public partial class RequestService
             Method = options.HttpMethod ?? throw new ArgumentNullException("Http Method can't be null")
         };
         return httpClient.SendAsync(requestMessage, options.CompletionOption, cancellationToken);
+    }
+
+    private static StringContent? GetCorrectHttpContent<T>(T content, JsonSerializerOptions serializerOptions = default!)
+    {
+        Type type = typeof(T);
+
+        bool isStruct = type.IsValueType && !type.IsPrimitive;
+        bool isClass = type.IsClass && !type.Equals(typeof(string));
+
+        return isClass || isStruct
+               ? new StringContent(JsonSerializer.Serialize(content, serializerOptions), Encoding.UTF8, MediaTypeNames.Application.Json)
+               : new StringContent(content!.ToString()!);
     }
 
     #endregion Sending Request
@@ -157,20 +178,18 @@ public partial class RequestService
 
     private ImmutableSortedSet<(string Route, string Controller, string RequestPath, HttpRequestMethod RequestMethod)> GetMetadata()
     {
-        var routes = _setupOptions.AccemblyRoutingType!.GetTypeInfo().DeclaredNestedTypes
+        var routes = SetupOptions.AccemblyRoutingType!.GetTypeInfo().DeclaredNestedTypes
                                     .SelectMany(typeInfo => typeInfo.DeclaredFields
                                                                     .Where(fieldInfo => fieldInfo.IsLiteral && !fieldInfo.IsInitOnly)
                                                                     .Select(@const =>
                                                                     {
                                                                         string route = @const.GetRawConstantValue()!.ToString()!.ToLower()!;
                                                                         HttpRequestMethod routeMethod = @const.GetCustomAttribute<ControllerHttpMethodAttribute>()?.HttpRequestMethod ?? throw new Exception("HttpMethod is not defined");
-                                                                        string controller = typeInfo.GetCustomAttribute<ControllerNameAttribute>()?.ControllerName ?? throw new Exception("Controller is not defined");
-                                                                        return (
-                                                                        Route: route,
-                                                                        Controller: controller,
-                                                                        RequestPath: $"{controller}/{route}",
-                                                                        RequestMethod: routeMethod
-                                                                        );
+                                                                        string controller = typeInfo.GetCustomAttribute<ControllerNameAttribute>()?.ControllerName?.ToLower() ?? throw new Exception("Controller is not defined");
+                                                                        return (Route: route,
+                                                                                Controller: controller,
+                                                                                RequestPath: $"{controller}/{route}",
+                                                                                RequestMethod: routeMethod);
                                                                     })).ToImmutableSortedSet();
         return routes;
     }
@@ -208,7 +227,7 @@ public partial class RequestService
 
     public static Dictionary<string, string?> GetQueryParameters(string query)
     {
-        NameValueCollection collection = System.Web.HttpUtility.ParseQueryString(query);
+        NameValueCollection collection = HttpUtility.ParseQueryString(query);
         return collection.AllKeys.Where(k => !string.IsNullOrWhiteSpace(k)).ToDictionary(k => k!, k => collection[k]);
     }
 

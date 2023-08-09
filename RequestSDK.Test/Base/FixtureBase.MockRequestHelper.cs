@@ -6,8 +6,9 @@ using System.Text.Json;
 using Moq.Protected;
 using Moq;
 using RequestSDK.Services;
-using Castle.Components.DictionaryAdapter.Xml;
+using System.Reflection.PortableExecutable;
 using System.Net.Http;
+using Castle.DynamicProxy;
 
 namespace RequestSDK.Test.Base;
 
@@ -15,20 +16,25 @@ public partial class FixtureBase
 {
     protected class MockRequestHelper
     {
-        
-        private StringContent? CorrectContentFormat<T>(T content)
+        private HttpResponseMessage _offlineResponseMessage = default!;
+
+        internal static bool IsPrimitiveType<T>(T _)
         {
             Type type = typeof(T);
 
             bool isStruct = type.IsValueType && !type.IsPrimitive;
             bool isClass = type.IsClass && !type.Equals(typeof(string));
-
-            return isClass || isStruct 
-                   ? new StringContent(JsonSerializer.Serialize(content), Encoding.UTF8, MediaTypeNames.Application.Json) 
-                   : new StringContent(content!.ToString()!);
+            return isClass is false || isStruct is false;
         }
 
-        internal HttpResponseMessage GenerateResponseMessage<T>(HttpStatusCode statusCode, T content)
+        private StringContent? CorrectContentFormat<T>(T content)
+        {
+            return IsPrimitiveType(content)
+                   ? new StringContent(content!.ToString()!)
+                   : new StringContent(JsonSerializer.Serialize(content), Encoding.UTF8, MediaTypeNames.Application.Json);
+        }
+
+        internal HttpResponseMessage CreateOfflineResponse<T>(HttpStatusCode statusCode, T content)
         {
 
             HttpResponseMessage responseMessage = new()
@@ -40,18 +46,19 @@ public partial class FixtureBase
             return responseMessage;
         }
 
-        internal HttpClient CreateOfflineHttpClient(HttpResponseMessage offlineResponse, string? clientBaseUrl = default, Action<HttpRequestMessage>? sendRequestChecks = default)
+        internal HttpClient CreateOfflineHttpClient(HttpResponseMessage offlineResponse, string? clientBaseUrl = default, Action<RequestCheckHelper>? requestCheckActions = default)
         {
             Mock<HttpMessageHandler> mockHttpMessageHandler = new();
-
+            _offlineResponseMessage = offlineResponse;
             mockHttpMessageHandler.Protected()
                                   .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
-                                  .Callback(new InvocationAction(invocation =>
+                                  .Callback<HttpRequestMessage, CancellationToken>((requestMessage, cancelationToken) =>
                                   {
-                                      HttpRequestMessage? typeArgument = invocation.Arguments[0] as HttpRequestMessage;
-                                      if (invocation.Arguments[0] is HttpRequestMessage requestMessage) sendRequestChecks?.Invoke(requestMessage);
-                                      else Assert.Fail("Offline HttpClient received wrong values");
-                                  }))
+                                      RequestCheckHelper handler = new(requestMessage);
+                                      requestCheckActions?.Invoke(handler);
+                                      var result = Task.Run(async () => await handler.RunParallelChecks()).Result;
+                                      if (result != null) throw result;
+                                  })
                                   .ReturnsAsync(offlineResponse);
 
 
@@ -73,6 +80,22 @@ public partial class FixtureBase
                 clientsFactory.Setup(factory => factory.CreateClient(offlineClient.Value.HttpClientName)).Returns(offlineClient.Key);
             }
             return clientsFactory.Object;
+        }
+
+        internal void ValidateResponse(HttpResponseMessage targetResponseMessage, Action<ResponseCheckHelper> checks)
+        {
+            ResponseCheckHelper handler = new(targetResponseMessage);
+            checks?.Invoke(handler);
+            var result = Task.Run(async () => await handler.RunParallelChecks()).Result;
+            if (result != null) throw result;
+        }
+
+        internal void ValidateResponse(Action<ResponseCheckHelper> checks)
+        {
+            ResponseCheckHelper handler = new(_offlineResponseMessage);
+            checks?.Invoke(handler);
+            var result = Task.Run(async () => await handler.RunParallelChecks()).Result;
+            if (result != null) throw result;
         }
     }
 }

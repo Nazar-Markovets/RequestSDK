@@ -10,7 +10,7 @@ public partial class RequestService
         internal HttpMethod? HttpMethod { get; set; }
         internal KeyValuePair<string, string?>[] RequestParameters { get; private set; }
         internal List<MediaTypeWithQualityHeaderValue> AcceptTypes { get; private set; }
-        internal string Path { get; private set; }
+        internal string Path { get; set; }
         internal byte? HttpClientId { get; set; }
         public Dictionary<string, string?>? CustomHeaders { get; private set; }
 
