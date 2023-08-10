@@ -343,17 +343,5 @@ namespace RequestSDK.Test.Services
         }
 
         #endregion Combine Query Parameters
-
-
-        #region Check Primitive Types
-
-        [Theory(DisplayName = $"Static. {nameof(RequestService.MustBeSendAsJson)}.")]
-        [ClassData(typeof(RequestContentTypes))]
-        public void Request_IsPrimitiveContentType(object content, bool mustBeJson)
-        {
-            Assert.Equal(mustBeJson, RequestService.MustBeSendAsJson(content));
-        }
-
-        #endregion Check Primitive Types
     }
 }

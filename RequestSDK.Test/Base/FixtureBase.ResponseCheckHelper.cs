@@ -22,25 +22,6 @@ public partial class FixtureBase
             return this;
         }
 
-        public ResponseCheckHelper CheckResponseContent<T>(T expectedContent)
-        {
-            AsParallelAsync(async () =>
-            {
-                bool? mustBeJson = RequestService.MustBeSendAsJson(expectedContent);
-                if (mustBeJson.HasValue is false) Assert.Fail("Expected content is null");
-
-                if (mustBeJson.Value)
-                {
-                    T? content = await _responseMessage.Content.ReadFromJsonAsync<T>();
-                    Assert.Equal(expectedContent, content);
-                }
-                else
-                {
-                    string content = await _responseMessage.Content.ReadAsStringAsync();
-                    Assert.Equal(expectedContent?.ToString(), content);
-                }
-            });
-            return this;
-        }
+        public ResponseCheckHelper CheckResponseContent<T>(T expectedContent) => (ResponseCheckHelper)CheckHttpContent(expectedContent, _responseMessage.Content);
     }
 }

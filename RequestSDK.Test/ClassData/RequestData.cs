@@ -7,48 +7,125 @@ namespace RequestSDK.Test.ClassData;
 
 public sealed class RequestData : IEnumerable<object[]>
 {
-    public IEnumerator<object[]> GetEnumerator()
+    public class TypedRequestData : IEquatable<TypedRequestData>
     {
-        yield return new object[] 
-        {
-            "Mocked HTTP response content",
-            "https://example.com",
-            "controller/action",
-            "RequestContent",
-            
-            new string[]{ MediaTypeNames.Application.Json, MediaTypeNames.Text.Html },
-            new KeyValuePair<string, string>[] 
-            {
-                RequestService.RequestHeader("X-KEY", "X-VALUE-1", "X-VALUE-2")
-            },
-            new KeyValuePair<string, string>[] 
-            {
-                RequestService.RequestParameter("first-name", "john"),
-                RequestService.RequestParameter("last-name", "doe"),
-                RequestService.RequestParameter("age", "21")
-            } 
-        };
+        public enum WorkerType : byte { ProjectManager, Developer, TeamLead }
+        public int Age { get; set; }
+        public double Salary { get; set; }
+        public float TaxPersent { get; set; }
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public bool IsNewWorker { get; set; }
+        public WorkerType JobType { get; set; }
 
-        yield return new object[]
+        public bool Equals(TypedRequestData? other)
         {
-            new { ResponseContentName = "Test Name", ResponseMessage = "Test Message", ResponseId = 1 },
-            "https://example.com",
-            "controller/action",
-            "RequestContent",
-
-            new string[]{ MediaTypeNames.Application.Json, MediaTypeNames.Text.Html },
-            new KeyValuePair<string, string>[]
-            {
-                RequestService.RequestHeader("X-KEY", "X-VALUE-1", "X-VALUE-2")
-            },
-            new KeyValuePair<string, string>[]
-            {
-                RequestService.RequestParameter("first-name", "john"),
-                RequestService.RequestParameter("last-name", "doe"),
-                RequestService.RequestParameter("age", "21")
-            }
-        };
+            return other != null
+                   && Age == other.Age
+                   && Salary == other.Salary
+                   && TaxPersent == other.TaxPersent
+                   && Name == other.Name
+                   && Description == other.Description
+                   && IsNewWorker == other.IsNewWorker
+                   && JobType == other.JobType;
+        }
     }
 
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    private readonly string StringHttpContent = "Mocked HTTP response content";
+    private readonly Func<object> GenerateAnonimousObjectHttpContent = () => new { RequestContentName = "Test Name", RequestMessage = "Test Message", RequestId = 1 };
+    private readonly TypedRequestData TypedObjectRequestContent = new TypedRequestData()
+    {
+        Age = 40,
+        TaxPersent = 15.5f,
+        Salary = 599.555d,
+        Description = "Worker",
+        IsNewWorker = true,
+        JobType = TypedRequestData.WorkerType.TeamLead,
+        Name = "John"
+    };
+
+    private readonly string ClientBasePath = "https://example.com";
+    private readonly string ClientEndPoint = "controller/action";
+    private readonly string[] AcceptTypes = new string[] { MediaTypeNames.Application.Json, MediaTypeNames.Text.Html };
+
+    private readonly KeyValuePair<string, string>[] RequestHeaders = new[]
+    {
+        RequestService.RequestHeader("X-KEY", "X-VALUE-1", "X-VALUE-2")
+    };
+
+    private readonly KeyValuePair<string, string>[] RequestParameters = new[]
+    {
+        RequestService.RequestParameter("first-name", "john"),
+        RequestService.RequestParameter("last-name", "doe"),
+        RequestService.RequestParameter("age", "21")
+    };
+
+    public IEnumerator<object[]> GetEnumerator()
+    {
+        //Check Response [string], Request [string]
+        yield return new object[]
+        {
+            StringHttpContent,
+            ClientBasePath,
+            ClientEndPoint,
+            StringHttpContent,
+            AcceptTypes,
+            RequestHeaders,
+            RequestParameters
+        };
+
+        //Check Response [string], Request [anonimous type]
+        yield return new object[]
+        {
+            StringHttpContent,
+            ClientBasePath,
+            ClientEndPoint,
+            GenerateAnonimousObjectHttpContent(),
+            AcceptTypes,
+            RequestHeaders,
+            RequestParameters
+        };
+
+        //Check Response [string], Request [typed complex object]
+        yield return new object[]
+        {
+            StringHttpContent,
+            ClientBasePath,
+            ClientEndPoint,
+            TypedObjectRequestContent,
+            AcceptTypes,
+            RequestHeaders,
+            RequestParameters
+        };
+
+        //Check Response [anonimous type], Request [string]
+        yield return new object[]
+        {
+            GenerateAnonimousObjectHttpContent(),
+            ClientBasePath,
+            ClientEndPoint,
+            StringHttpContent,
+            AcceptTypes,
+            RequestHeaders,
+            RequestParameters
+        };
+
+        //Check Response [typed complex object], Request [string]
+        yield return new object[]
+        {
+            TypedObjectRequestContent,
+            ClientBasePath,
+            ClientEndPoint,
+            StringHttpContent,
+            AcceptTypes,
+            RequestHeaders,
+            RequestParameters
+        };
+
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
 }

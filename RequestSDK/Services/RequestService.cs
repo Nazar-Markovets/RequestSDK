@@ -122,23 +122,9 @@ public partial class RequestService
 
     public static StringContent? GetCorrectHttpContent<T>(T? content, JsonSerializerOptions serializerOptions = default!)
     {
-        bool? mustBeJson = MustBeSendAsJson(content);
-        if (mustBeJson.HasValue is false) return null;
-
-        return mustBeJson.Value
-               ? new StringContent(JsonSerializer.Serialize(content, serializerOptions), Encoding.UTF8, MediaTypeNames.Application.Json)
-               : new StringContent(content!.ToString()!);
-    }
-
-    public static bool? MustBeSendAsJson<T>(T content)
-    {
-        if (content is null) return null;
-
-        Type type = content.GetType() ?? typeof(T);
-
-        bool isStruct = type.IsValueType && !type.IsPrimitive;
-        bool isClass = (type.IsClass && !type.Equals(typeof(string))) || IsAnonymousType(type);
-        return isClass || isStruct;
+        return content is null
+               ? default
+               : new StringContent(JsonSerializer.Serialize(content, serializerOptions), Encoding.UTF8, MediaTypeNames.Application.Json);
     }
 
     private static bool IsAnonymousType(Type type)

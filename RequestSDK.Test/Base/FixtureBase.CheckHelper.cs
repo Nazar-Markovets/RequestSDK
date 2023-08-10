@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Net.Http.Json;
+using System.Reflection;
+using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
 using System.Text;
-
-
+using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace RequestSDK.Test.Base;
 
@@ -44,6 +47,31 @@ public partial class FixtureBase
             return HandleDelegateException(exception, revision);
         });
 
+
+        protected CheckHelper CheckHttpContent<T>(T expectedContent, HttpContent? httpContent)
+        {
+            if (expectedContent is null) Assert.Fail("Expected content is null");
+            if (httpContent is null) Assert.Fail("Actual content is null");
+            Type targetGenericType = expectedContent.GetType();
+            Type sourceType = typeof(HttpContentJsonExtensions);
+            string targetMethodName = nameof(HttpContentJsonExtensions.ReadFromJsonAsync);
+            MethodInfo targetMethod = sourceType.GetMethods(BindingFlags.Static | BindingFlags.Public)
+                                                  .Where(method => method.Name == targetMethodName)
+                                                  .Where(method => method.IsGenericMethod)
+                                                  .Where(method => method.GetGenericArguments().Length == 1)
+                                                  .Where(method => method.GetParameters().Any(p => p.ParameterType == typeof(JsonSerializerOptions)))
+                                                  .First()
+                                                  .MakeGenericMethod(targetGenericType);
+
+            AsParallelAsync(async () =>
+            {
+                Task serializeTask = (Task)targetMethod.Invoke(null, new object?[] { httpContent, default(JsonSerializerOptions), default(CancellationToken) })!;
+                await serializeTask;
+                object? actualContent = serializeTask.GetType().GetProperty("Result")?.GetValue(serializeTask);
+                Assert.Equal(expectedContent, actualContent);
+            });
+            return this;
+        }
 
         internal async Task<Exception?> RunParallelChecks()
         {
