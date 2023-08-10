@@ -63,15 +63,44 @@ jobs:
         id: scan_versions
         run: |
           sudo apt-get install jq
-          response=$(curl --silent -H "Authorization: Bearer ${{ secrets.NUGET_PACKAGE_TOKEN }}" "${{env.PACKAGES_URL}}")
-          versions=$(echo "$response" | jq .[].name)
-          last_version=$(echo "$versions" | tr -d '"' | sort -V | tail -n 1)
+          
+          echo -e "${{env.GREEN}}Sending request to '${{env.PACKAGES_URL}}'${{env.RESET}}"
+          
+          repository_checks_response=$(curl --write-out "\n%{http_code}" --silent -H "Authorization: Bearer ${{ secrets.NUGET_PACKAGE_TOKEN }}" "${{env.PACKAGES_URL}}")
+          status_code=$(echo "$repository_checks_response" | tail -n 1)
+          response_body=$(echo "$repository_checks_response" | sed '$d')
+          versions=""
+          last_version="0.0.1"
+          declare -A statusMessages
+          statusMessages[200]="Status Code: 200 (OK)"
+          statusMessages[404]="Status Code: 404 (Not Found)"
+          statusMessages[401]="Status Code: 401 (Unauthorized)"
 
-          echo -e "${{env.GREEN}}Found Versions:${{env.RESET}}"
-          echo "$versions"
+          if [ "$status_code" -eq 200 ]; then
+            echo -e "${{env.GREEN}}${statusMessages[200]} ${{env.RESET}}"
+            packages_response=$(curl --silent -H "Authorization: Bearer ${{ secrets.NUGET_PACKAGE_TOKEN }}" "${{env.PACKAGES_URL}}")
+            versions=$(echo "$packages_response" | jq -r '.[].name')
+            if [ -n "$versions" ]; then
+              echo -e "${{env.GREEN}}Found Versions:${{env.RESET}}"
+              echo "$versions"
+              last_version=$(echo "$versions" | tr -d '"' | sort -V | tail -n 1)
+            fi
+          elif [ "$status_code" -eq 404 ]; then
+            echo -e "${{env.WARNING}}${statusMessages[404]}${{env.RESET}}"
+          elif [ "$status_code" -eq 401 ]; then
+            echo -e "${{env.WARNING}}${statusMessages[401]}${{env.RESET}}"
+            echo "Response: $response_body"
+            exit 1
+          else
+            echo -e "${{env.WARNING}}Status Code: $status_code ${{env.RESET}}"
+            echo "Response: $response_body"
+            exit 1
+          fi
+          
           echo -e "${{env.GREEN}}Autodetect Verions:${{env.RESET}} ${{format('{0}{1}{2}', env.AUTO_DETECT_VERSION == 'true' && env.GREEN || env.ERROR, env.AUTO_DETECT_VERSION, env.RESET)}}"
           
           if [[ ${{ steps.version_validation.outputs.version-valid }} == false ]] || [[ $versions == *"${{github.event.inputs.version}}"* ]]; then
+            
             if [[ ${{ steps.version_validation.outputs.version-empty }} == true ]]; then
               echo -e "${{env.WARNING}}Package with empty version can't be used.${{env.RESET}}"
             else
@@ -81,13 +110,19 @@ jobs:
             if [[ ${{env.AUTO_DETECT_VERSION}} == true ]]; then
                 echo -e "${{env.GREEN}}Searching for suitable version...${{env.RESET}}"
                 echo -e "${{env.LIGHT_GREEN}}Last Package Version: '$last_version' ${{env.RESET}}"
-                IFS='.' read -r -a version_parts <<< "$last_version"
-                ((version_parts[2]++))
-                # 1.9.9 -> 1.9.10
-                new_patch_version="${version_parts[0]}.${version_parts[1]}.${version_parts[2]}"
                 
-                echo -e "${{env.GREEN}}Package with version '$new_patch_version' will be used instead of given version' ${{env.RESET}}"
-                echo "PACKAGE_VERSION=$new_patch_version" >> $GITHUB_ENV
+                if [ "$status_code" -eq 200 ]; then
+                  IFS='.' read -r -a version_parts <<< "$last_version"
+                  ((version_parts[2]++))
+                  # 1.9.9 -> 1.9.10
+                  new_patch_version="${version_parts[0]}.${version_parts[1]}.${version_parts[2]}"
+
+                  echo -e "${{env.GREEN}}Package with version '$new_patch_version' will be used instead of given version' ${{env.RESET}}"
+                  echo "PACKAGE_VERSION=$new_patch_version" >> $GITHUB_ENV
+                else
+                  echo -e "${{env.GREEN}}Package with version '$last_version' will be used instead of given version' ${{env.RESET}}"
+                  echo "PACKAGE_VERSION=$last_version" >> $GITHUB_ENV
+                fi
             else
               echo -e "${{env.ERROR}}Versions conflict can't be resloved. Change 'Version' or choose 'Set Version automatically -> yes'${{env.RESET}}"
               exit 1
