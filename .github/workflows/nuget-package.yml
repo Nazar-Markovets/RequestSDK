@@ -36,7 +36,7 @@ on:
 env:
   BUILD_CONFIG : 'Release'
   PROJECT_PATH : 'RequestSDK/RequestSDK.csproj'
-  PACKAGE_OUTPUT_DIRECTORY : ${{github.workspace}}/PackagePath
+  PACKAGE_STORE_DIRECTORY : '${{github.workspace}}/RequestSDK.Packages'
   DEPLOY_URL : 'https://nuget.pkg.github.com/${{ github.actor }}/index.json'
   PACKAGES_URL : 'https://api.github.com/user/packages/nuget/requestsdk/versions'
   AUTO_DETECT_VERSION : ${{ github.event.inputs.autodetect == 'yes' && true || false }}
@@ -182,17 +182,21 @@ jobs:
           dotnet build ${{env.PROJECT_PATH}} --no-restore --configuration ${{env.BUILD_CONFIG}}
           echo -e "${{env.GREEN}}Building was successful ${{env.RESET}}"
 
+      - name: Setup Package Metadata
+        run: |
+          sed -i 's/<version>0.0.1<\/version>/<version>${{env.PACKAGE_VERSION}}<\/version>/g' ${{env.PACKAGE_STORE_DIRECTORY}}/metadata.nuspec
+
       - name: Pack Project
         run: |
           echo -e "${{env.LIGHT_GREEN}}Packing version:${{env.RESET}} $GREEN '${{env.PACKAGE_VERSION}}' $RESET"
-          dotnet pack ${{env.PROJECT_PATH}} --no-restore --no-build --configuration ${{env.BUILD_CONFIG}} -p:PackageVersion=${{env.PACKAGE_VERSION}} --output ${{env.PACKAGE_OUTPUT_DIRECTORY}}
+          dotnet pack ${{env.PROJECT_PATH}} --no-restore --no-build --configuration ${{env.BUILD_CONFIG}} -p:NuspecFile=${{env.PACKAGE_STORE_DIRECTORY}}/metadata.nuspec --output ${{env.PACKAGE_STORE_DIRECTORY}}
           echo -e "${{env.GREEN}}Packing was successful ${{env.RESET}}"
 
       - name: Push Package
         id: pushing
         continue-on-error: true
         run: |
-          dotnet nuget push ${{env.PACKAGE_OUTPUT_DIRECTORY}}/*.nupkg --source ${{env.DEPLOY_URL}} --api-key ${{secrets.NUGET_PACKAGE_TOKEN}}
+          dotnet nuget push ${{env.PACKAGE_STORE_DIRECTORY}}/*.nupkg --source ${{env.DEPLOY_URL}} --api-key ${{secrets.NUGET_PACKAGE_TOKEN}}
           echo -e "${{env.GREEN}}Package Pushing was successful ${{env.RESET}}"
 
       - name: Check on failures

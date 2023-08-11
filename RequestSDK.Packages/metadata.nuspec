@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+    <metadata>
+        <id>Request.SDK</id>
+        <description>
+            Request SDK that allows to create HTTP requests 
+            with registered Http Clients or without them.
+            Current SDK allows to use mechanism
+            1. Define [Route|Custom] class with included classes [ActionRoute|HomeRoute|Custom] that uses Attributes from SDK [ControllerName], [ControllerHttpMethod]
+            2. Setup Request Service Options and set contaner type
+            3. On sending request, set only ActionRoute.CustomRoute [const|string] with attribute [ControllerHttpMethod]
+        </description>
+        <authors>Nazar Markovets</authors>
+        <readme>docs\README.md</readme>
+        <version>0.0.1</version>
+    </metadata>
+    <files>
+        <file src="..\README.md" target="docs\" />
+    </files>
+</package>
