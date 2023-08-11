@@ -7,21 +7,16 @@
       <Configurations>Debug;Release;Cloud.Git</Configurations>
       <PackageId>RequestSDK</PackageId>
       <Authors>Nazar Markovets</Authors>
+      <Summary>RequestSDK is a useful .NET toolkit for making Http requests.</Summary>
       <Description>
-        Request SDK that allows to create HTTP requests with registered Http Clients or without them. Current SDK allows:
-        1. Use SDK routing with attributes ControllerName, ControllerHttpMethod
-        2. Make operations with request url
-        2. Use registered clients and they base urls
-        3. Use Http client created before using
+        Request SDK is a useful .NET tookit for making Http requests. You can easy inject the toolkit into your application using extensions, or create services to resolve task with: Http request, request Url, request Endpoint, request Parameters
       </Description>
       <PackageReadmeFile>README.md</PackageReadmeFile>
+      <PackageTags>http</PackageTags>
     </PropertyGroup>
 
     <ItemGroup>
-      <None Include="..\README.md">
-        <Pack>True</Pack>
-        <PackagePath>\</PackagePath>
-      </None>
+      <Content Include="README.md" Pack="true" PackagePath="\" />
     </ItemGroup>
 
     <ItemGroup>
