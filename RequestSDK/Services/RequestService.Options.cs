@@ -35,7 +35,7 @@ public partial class RequestService
             RequestParameters = Array.Empty<KeyValuePair<string, string?>>();
         }
 
-        public Options(HttpMethod httpMethod, string requestPath, byte registeredHttpClientId = byte.MinValue)
+        public Options(HttpMethod httpMethod, string requestPath, byte? registeredHttpClientId = default)
         {
             HttpMethod = httpMethod;
             Path = requestPath;

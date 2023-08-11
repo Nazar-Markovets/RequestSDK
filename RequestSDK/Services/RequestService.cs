@@ -51,7 +51,7 @@ public partial class RequestService
                 _cache = new MemoryCache(new MemoryCacheOptions());
                 _routingInfo = GetCachedMetadata();
             }
-            _instances = value.HttpClientSettings?.ToDictionary(kv => kv.HttpClientId, kv => kv);
+            _instances = value.HttpClientSettings?.ToDictionary(kv => kv.HttpClientId!.Value, kv => kv);
         }
     }
 
@@ -105,7 +105,7 @@ public partial class RequestService
             if (options.AcceptTypes is null) httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
             else options.AcceptTypes?.ForEach(acceptType => httpClient.DefaultRequestHeaders.Accept.Add(acceptType));
 
-            AuthenticationHeaderValue? authenticationHeader = options.Authentication ?? SetupOptions.Authentication?.Invoke();
+            AuthenticationHeaderValue? authenticationHeader = options.Authentication ?? SetupOptions.Authentication?.Invoke(new());
             httpClient.DefaultRequestHeaders.Authorization = authenticationHeader;
 
             options.CustomHeaders?.ToList()?.ForEach(header => httpClient.DefaultRequestHeaders.Add(header.Key, header.Value));

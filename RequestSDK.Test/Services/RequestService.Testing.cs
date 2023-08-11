@@ -145,7 +145,7 @@ public partial class RequestService_Testing : FixtureBase
         RequestService.Options requestOptions = new RequestService.Options(HttpMethod.Get, ClientRoutePath)
                                                                   .AddHeaders(RequestHeaders!)
                                                                   .AddAcceptTypes(RequestAcceptTypes)
-                                                                  .AddHttpClientId(httpClientSettings.HttpClientId)
+                                                                  .AddHttpClientId(httpClientSettings.HttpClientId.Value)
                                                                   .AddRequestParameters(RequestQueryParameters!);
         HttpResponseMessage response = await requestService.ExecuteRequestAsync(requestOptions, RequestContent);
 
