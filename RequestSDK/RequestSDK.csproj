@@ -1,11 +1,28 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-        <Configurations>Debug;Release;Cloud.Git</Configurations>
+      <TargetFramework>net6.0</TargetFramework>
+      <ImplicitUsings>enable</ImplicitUsings>
+      <Nullable>enable</Nullable>
+      <Configurations>Debug;Release;Cloud.Git</Configurations>
+      <PackageId>RequestSDK</PackageId>
+      <Authors>Nazar Markovets</Authors>
+      <Description>
+        Request SDK that allows to create HTTP requests with registered Http Clients or without them. Current SDK allows:
+        1. Use SDK routing with attributes ControllerName, ControllerHttpMethod
+        2. Make operations with request url
+        2. Use registered clients and they base urls
+        3. Use Http client created before using
+      </Description>
+      <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
+
+    <ItemGroup>
+      <None Include="..\README.md">
+        <Pack>True</Pack>
+        <PackagePath>\</PackagePath>
+      </None>
+    </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="2.1.1" />

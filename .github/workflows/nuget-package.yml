@@ -145,10 +145,9 @@ jobs:
                 echo -e "${{env.LIGHT_GREEN}}Last Created Package Version: '$last_version' ${{env.RESET}}"
                 
                 if [[ ${{ steps.api_connectivity.outputs.status }} == 200 ]]; then
-                  IFS='.' read -r -a version_parts <<< "$last_version"
-                  ((version_parts[2]++))
-                  # 1.9.9 -> 1.9.10
-                  new_patch_version="${version_parts[0]}.${version_parts[1]}.${version_parts[2]}"
+                  last_minor_version="${last_version##*.}"
+                  new_minor_version=$((last_minor_version + 1))
+                  new_patch_version="${last_version%.*}.$new_minor_version"
 
                   echo -e "${{env.GREEN}}Package with version '$new_patch_version' will be used to avoid conflicts' ${{env.RESET}}"
                   echo "PACKAGE_VERSION=$new_patch_version" >> $GITHUB_ENV
@@ -182,14 +181,10 @@ jobs:
           dotnet build ${{env.PROJECT_PATH}} --no-restore --configuration ${{env.BUILD_CONFIG}}
           echo -e "${{env.GREEN}}Building was successful ${{env.RESET}}"
 
-      - name: Setup Package Metadata
-        run: |
-          sed -i 's/<version>0.0.1<\/version>/<version>${{env.PACKAGE_VERSION}}<\/version>/g' ${{env.PACKAGE_STORE_DIRECTORY}}/metadata.nuspec
-
       - name: Pack Project
         run: |
           echo -e "${{env.LIGHT_GREEN}}Packing version:${{env.RESET}} $GREEN '${{env.PACKAGE_VERSION}}' $RESET"
-          dotnet pack ${{env.PROJECT_PATH}} --no-restore --no-build --configuration ${{env.BUILD_CONFIG}} -p:NuspecFile=${{env.PACKAGE_STORE_DIRECTORY}}/metadata.nuspec --output ${{env.PACKAGE_STORE_DIRECTORY}}
+          dotnet pack ${{env.PROJECT_PATH}} --no-restore --no-build --configuration ${{env.BUILD_CONFIG}} -p:PackageVersion=${{env.PACKAGE_VERSION}} --output ${{env.PACKAGE_STORE_DIRECTORY}}
           echo -e "${{env.GREEN}}Packing was successful ${{env.RESET}}"
 
       - name: Push Package
