@@ -57,20 +57,15 @@ jobs:
             echo -e "${{env.ERROR}}Format of version '${{github.event.inputs.version}}' is not valid. Autodetected version can't be used.${{env.RESET}}"
             exit 1
           fi
-
-      - uses: actions/checkout@v3
-      - name: Scan deployed packages for available version conflicts
-        id: scan_versions
+      
+      - name: Check API connectivity
+        id: api_connectivity
         run: |
-          sudo apt-get install jq
-          
           echo -e "${{env.GREEN}}Sending request to '${{env.PACKAGES_URL}}'${{env.RESET}}"
-          
           repository_checks_response=$(curl --write-out "\n%{http_code}" --silent -H "Authorization: Bearer ${{ secrets.NUGET_PACKAGE_TOKEN }}" "${{env.PACKAGES_URL}}")
           status_code=$(echo "$repository_checks_response" | tail -n 1)
           response_body=$(echo "$repository_checks_response" | sed '$d')
-          versions=""
-          last_version="0.0.1"
+          
           declare -A statusMessages
           statusMessages[200]="Status Code: 200 (OK)"
           statusMessages[404]="Status Code: 404 (Not Found)"
@@ -78,6 +73,28 @@ jobs:
 
           if [ "$status_code" -eq 200 ]; then
             echo -e "${{env.GREEN}}${statusMessages[200]} ${{env.RESET}}"
+            echo "status=200" >> $GITHUB_OUTPUT
+          elif [ "$status_code" -eq 404 ]; then
+            echo -e "${{env.WARNING}}${statusMessages[404]}${{env.RESET}}"
+            echo "status=404" >> $GITHUB_OUTPUT
+          elif [ "$status_code" -eq 401 ]; then
+            echo -e "${{env.ERROR}}${statusMessages[401]}${{env.RESET}}"
+            echo "Response: $response_body"
+            exit 1
+          else
+            echo -e "${{env.WARNING}}Status Code: $status_code ${{env.RESET}}"
+            echo "Response: $response_body"
+            exit 1
+          fi
+
+      - name: Scan deployed packages for available version conflicts
+        id: scan_versions
+        run: |
+          sudo apt-get install jq
+          versions=""
+          last_version="0.0.1"
+          
+          if [[ ${{ steps.api_connectivity.outputs.status }} == 200 ]]; then
             packages_response=$(curl --silent -H "Authorization: Bearer ${{ secrets.NUGET_PACKAGE_TOKEN }}" "${{env.PACKAGES_URL}}")
             versions=$(echo "$packages_response" | jq -r '.[].name')
             if [ -n "$versions" ]; then
@@ -85,16 +102,6 @@ jobs:
               echo "$versions"
               last_version=$(echo "$versions" | tr -d '"' | sort -V | tail -n 1)
             fi
-          elif [ "$status_code" -eq 404 ]; then
-            echo -e "${{env.WARNING}}${statusMessages[404]}${{env.RESET}}"
-          elif [ "$status_code" -eq 401 ]; then
-            echo -e "${{env.WARNING}}${statusMessages[401]}${{env.RESET}}"
-            echo "Response: $response_body"
-            exit 1
-          else
-            echo -e "${{env.WARNING}}Status Code: $status_code ${{env.RESET}}"
-            echo "Response: $response_body"
-            exit 1
           fi
           
           echo -e "${{env.GREEN}}Autodetect Verions:${{env.RESET}} ${{format('{0}{1}{2}', env.AUTO_DETECT_VERSION == 'true' && env.GREEN || env.ERROR, env.AUTO_DETECT_VERSION, env.RESET)}}"
@@ -111,7 +118,7 @@ jobs:
                 echo -e "${{env.GREEN}}Searching for suitable version...${{env.RESET}}"
                 echo -e "${{env.LIGHT_GREEN}}Last Package Version: '$last_version' ${{env.RESET}}"
                 
-                if [ "$status_code" -eq 200 ]; then
+                if [[ ${{ steps.api_connectivity.outputs.status }} == 200 ]]; then
                   IFS='.' read -r -a version_parts <<< "$last_version"
                   ((version_parts[2]++))
                   # 1.9.9 -> 1.9.10
@@ -131,8 +138,10 @@ jobs:
             echo -e "${{env.LIGHT_GREEN}}Package with version '${{github.event.inputs.version}}' has no conflicts${{env.RESET}}"
             echo "PACKAGE_VERSION=${{github.event.inputs.version}}" >> $GITHUB_ENV
           fi
-
+      
+      - uses: actions/checkout@v3
       - name: Setup .NET
+        
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: 6.0.x
