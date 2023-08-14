@@ -1,10 +1,7 @@
-﻿using System.Net.Http.Headers;
-
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 using RequestSDK.Services;
-
 
 namespace RequestSDK.Extensions;
 
@@ -13,8 +10,29 @@ public static class ConnectExtensions
     /// <summary>
     /// Register <see cref="RequestService.HttpClientSettings"/> that will be passed to registered request service.
     /// In this case you can paste <see cref="RequestService.HttpClientSettings.HttpClientId"/> and set only request endpoints
+    /// <code>
+    /// class Routing
+    /// {
+    ///     [ControllerName("api/home")]
+    ///     class HomeRoute
+    ///     {
+    ///         [ControllerHttpMethod(HttpRequestMethod.Get)]
+    ///         const string StatusCall = "status_call"
+    ///     }
+    /// }
+    /// 
+    /// builder.Services.RegisterHttpClients
+    /// (
+    ///     clientConfiguration => {
+    ///         clientConfiguration.HttpClientName = "X.Client.Name";
+    ///         clientConfiguration.HttpClientId = 1;
+    ///         clientConfiguration.BaseAddress = new Uri("https://example.com");
+    ///         clientConfiguration.Authentication = scheme => new AuthenticationHeaderValue(scheme.Bearer, "X-Token-Key");
+    ///         clientConfiguration.ClientRoutingType = typeof(Routing);
+    ///     }
+    /// );
+    /// </code>
     /// </summary>
-    /// <param name="httpClientsConfiguration">Configure your future Http Clients</param>
     public static void RegisterHttpClients(this IServiceCollection services, params Action<RequestService.HttpClientSettings>[] httpClientsConfiguration)
     {
         RequestService.HttpClientSettings[] registeredSettings = new RequestService.HttpClientSettings[httpClientsConfiguration.Length];
@@ -44,24 +62,7 @@ public static class ConnectExtensions
         }
     }
 
-    /// <summary>
-    /// Register Request Service with known routing contaner
-    /// Routing container creation:
-    /// <code>
-    /// class Routing
-    /// {
-    ///     [ControllerName("api/home")]
-    ///     class HomeRoute
-    ///     {
-    ///         [ControllerHttpMethod(HttpRequestMethod.Get)]
-    ///         const string StatusCall = "status_call"
-    ///     }
-    /// }
-    /// 
-    /// builder.Services.RegisterRequestService(typeof(Routing))
-    /// </code>
-    /// </summary>
-    /// <param name="routingContainer">Parent-contaner class which has classes marked with ControllerName attributes</param>
+    /// <summary>Register Request Service to call the service via Dependency Injection</summary>
     public static void RegisterRequestService(this IServiceCollection services)
     {
         services.TryAddSingleton(services =>
