@@ -44,10 +44,6 @@ public static class ConnectExtensions
         }
     }
 
-    [Obsolete("It is not recommended not to use Http Clients registration and HttpFactory. Use it for your own risk")]
-    public static void RegisterRequestService(this IServiceCollection services) =>
-        AddRequestServiceSingleton(services, default, default);
-
     /// <summary>
     /// Register Request Service with known routing contaner
     /// Routing container creation:
@@ -62,32 +58,16 @@ public static class ConnectExtensions
     ///     }
     /// }
     /// 
-    /// builder.Services.RegisterRequestService(typeof(Routing), schemes => new AuthenticationHeaderValue(schemes.Bearer, "XXXX-KEY-XXXX"))
-    /// builder.Services.RegisterRequestService(typeof(Routing), default)
+    /// builder.Services.RegisterRequestService(typeof(Routing))
     /// </code>
     /// </summary>
     /// <param name="routingContainer">Parent-contaner class which has classes marked with ControllerName attributes</param>
-    /// <param name="authentication">Authentication key that can be set on demand</param>
-
-    public static void RegisterRequestService(this IServiceCollection services, Type? routingContainer, Func<Schemes.AuthenticationSchemes, AuthenticationHeaderValue>? authentication = default) => 
-        AddRequestServiceSingleton(services, routingContainer, authentication);
-
-    public static void RegisterRequestService(this IServiceCollection services, Func<Schemes.AuthenticationSchemes, AuthenticationHeaderValue>? authentication, Type? routingContainer = default) =>
-        AddRequestServiceSingleton(services, routingContainer, authentication);
-
-    private static void AddRequestServiceSingleton(IServiceCollection services, Type? routingContainer = default, Func<Schemes.AuthenticationSchemes, AuthenticationHeaderValue>? authentication = default)
+    public static void RegisterRequestService(this IServiceCollection services)
     {
         services.TryAddSingleton(services =>
         {
-            RequestService.RequestServiceOptions serviceOptions = new()
-            {
-                Factory = services.GetRequiredService<IHttpClientFactory>(),
-                HttpClientSettings = services.GetServices<RequestService.HttpClientSettings>(),
-                AccemblyRoutingType = routingContainer,
-                Authentication = authentication
-
-            };
-            return new RequestService(serviceOptions);
+            return new RequestService(services.GetService<IHttpClientFactory>(),
+                                      services.GetServices<RequestService.HttpClientSettings>().ToArray());
         });
     }
 }

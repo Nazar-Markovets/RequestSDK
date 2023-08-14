@@ -14,19 +14,19 @@ namespace RequestSDK.Test.Services
 
         [Fact(DisplayName = "Creating. SDK routing")]
         public void RequestOptionsSdkRoutingInitialization() =>
-            Assert.Null(Record.Exception(() => new RequestService.Options(AccemblyRouting.ActionRouting.UpdateMessage)));
+            Assert.Null(Record.Exception(() => RequestService.Options.WithRegisteredRouting(AccemblyRouting.ActionRouting.UpdateMessage)));
 
         [Fact(DisplayName = "Creating. Empty HttpClientId")]
         public void RequestOptionsHttpClientEmptyInitialization() =>
-            Assert.Null(Record.Exception(() => new RequestService.Options(HttpMethod.Get, "action/get?Trace=1&Name=Test")));
+            Assert.Null(Record.Exception(() => RequestService.Options.WithoutRegisteredClient(HttpMethod.Get, "action/get?Trace=1&Name=Test")));
 
         [Fact(DisplayName = "Creating. Not empty generic HttpClientId")]
         public void RequestOptionsCustomOptions() =>
-            Assert.Null(Record.Exception(() => new RequestService.Options(HttpMethod.Get, "action/get?Trace=1&Name=Test").AddHttpClientId(OptionsDefault.OptionsType.UseGenericHttpClientId)));
+            Assert.Null(Record.Exception(() => RequestService.Options.WithRegisteredClient(HttpMethod.Get, "action/get?Trace=1&Name=Test", OptionsDefault.OptionsType.UseGenericHttpClientId)));
 
         [Fact(DisplayName = "Creating. Not empty HttpClientId")]
         public void RequestOptionsHttpClientInitialization() =>
-            Assert.Null(Record.Exception(() => new RequestService.Options(HttpMethod.Get, "action/get?Trace=1&Name=Test").AddHttpClientId(1)));
+            Assert.Null(Record.Exception(() => RequestService.Options.WithRegisteredClient(HttpMethod.Get, "action/get?Trace=1&Name=Test", 1)));
 
         [Fact(DisplayName = "Creating. Custom Options")]
         public void RequestOptions_Custom_Initialization() => Assert.Null(Record.Exception(() => OptionsCustom.GenerateInstance(HttpMethod.Get, "action/get?Trace=1&Name=Test")));
@@ -92,7 +92,7 @@ namespace RequestSDK.Test.Services
         [ClassData(typeof(HttpMethods))]
         public void RequestOptions_Default_Initialization_HttpMethods(HttpMethod method, string route)
         {
-            Assert.Null(Record.Exception(() => OptionsDefault.GenerateInstance(method, route)));
+            Assert.Null(Record.Exception(() => OptionsDefault.GenerateInstance(method, route, null)));
         }
     }
 }

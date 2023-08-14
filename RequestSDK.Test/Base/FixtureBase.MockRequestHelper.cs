@@ -19,7 +19,7 @@ public partial class FixtureBase
 
             HttpResponseMessage responseMessage = new()
             {
-                Content = RequestService.GetCorrectHttpContent(content),
+                Content = RequestService.GetCorrectHttpContent(content, MediaTypeNames.Application.Json),
                 StatusCode = statusCode,
             };
 

@@ -11,7 +11,7 @@ namespace RequestSDK.Schemes;
 /// <summary>
 /// <see href="https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml"/>
 /// </summary>
-public sealed class AuthenticationSchemes
+public class AuthenticationSchemes
 {
     public readonly string Basic = "Basic";
     public readonly string Bearer = "Bearer";
