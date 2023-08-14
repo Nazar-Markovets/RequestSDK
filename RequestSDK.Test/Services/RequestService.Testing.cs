@@ -32,10 +32,9 @@ public partial class RequestService_Testing : FixtureBase
                          .CheckRequestAcceptType("*/*");
         });
         IHttpClientFactory factory = MockRequestHelper.CreateOfflineFactory(httpClient, httpClientSettings);
-        RequestService.RequestServiceOptions requestOptions = new(factory, httpClientSettings);
 
-        RequestService requestService = new(requestOptions);
-        HttpResponseMessage response = await requestService.ExecuteRequestAsync(new RequestService.Options(HttpMethod.Get, ClientBaseURL, httpClientSettings.HttpClientId));
+        RequestService requestService = new(factory, httpClientSettings);
+        HttpResponseMessage response = await requestService.ExecuteRequestAsync(RequestService.Options.WithRegisteredClient(HttpMethod.Get, ClientBaseURL, httpClientSettings.HttpClientId.Value));
 
         MockRequestHelper.ValidateResponse(response, responseChecks =>
         {
@@ -58,10 +57,9 @@ public partial class RequestService_Testing : FixtureBase
                          .CheckRequestAcceptType("*/*");
         });
         IHttpClientFactory factory = MockRequestHelper.CreateOfflineFactory(httpClient, httpClientSettings);
-        RequestService.RequestServiceOptions requestOptions = new(factory, httpClientSettings);
         
-        RequestService requestService = new(requestOptions);
-        HttpResponseMessage response = await requestService.ExecuteRequestAsync(new RequestService.Options(HttpMethod.Get, "controller/action", httpClientSettings.HttpClientId));
+        RequestService requestService = new(factory, httpClientSettings);
+        HttpResponseMessage response = await requestService.ExecuteRequestAsync(RequestService.Options.WithRegisteredClient(HttpMethod.Get, "controller/action", httpClientSettings.HttpClientId.Value));
 
         MockRequestHelper.ValidateResponse(response, responseChecks =>
         {
@@ -86,7 +84,7 @@ public partial class RequestService_Testing : FixtureBase
         });
         
         RequestService requestService = new(httpClient);
-        HttpResponseMessage response = await requestService.ExecuteRequestAsync(new RequestService.Options(HttpMethod.Get, overrideRequestBasePath));
+        HttpResponseMessage response = await requestService.ExecuteRequestAsync(RequestService.Options.WithoutRegisteredClient(HttpMethod.Get, overrideRequestBasePath));
 
         MockRequestHelper.ValidateResponse(response, responseChecks =>
         {
@@ -98,6 +96,7 @@ public partial class RequestService_Testing : FixtureBase
     [Fact(DisplayName = "Create Request. Without Registered Client. Use SDK Routing")]
     public async Task RequestService_WithoutClient_SDKRouting()
     {
+        RequestService.HttpClientSettings<AccemblyRouting> httpClientSettings = new() { HttpClientId = 1, HttpClientName = TargetClientId };
         HttpResponseMessage offlineResponse = MockRequestHelper.CreateOfflineResponse(HttpStatusCode.OK, ResponseContent);
         HttpClient httpClient = MockRequestHelper.CreateOfflineHttpClient(offlineResponse, ClientBaseURL, requestChecks =>
         {
@@ -105,12 +104,11 @@ public partial class RequestService_Testing : FixtureBase
                          .CheckRequestUrl("https://example.com/action/message/update")
                          .CheckRequestAcceptType("*/*");
         });
+        IHttpClientFactory factory = MockRequestHelper.CreateOfflineFactory(httpClient, httpClientSettings);
 
-        RequestService requestService = new(httpClient)
-        {
-            SetupOptions = new (){ AccemblyRoutingType = typeof(AccemblyRouting) }
-        };
-        HttpResponseMessage response = await requestService.ExecuteRequestAsync(new RequestService.Options(ActionRouting.UpdateMessage));
+        RequestService requestService = new(factory, httpClientSettings);
+
+        HttpResponseMessage response = await requestService.ExecuteRequestAsync(RequestService.Options.WithRegisteredRouting(ActionRouting.UpdateMessage, httpClientSettings.HttpClientId));
 
         MockRequestHelper.ValidateResponse(response, responseChecks =>
         {
@@ -139,14 +137,12 @@ public partial class RequestService_Testing : FixtureBase
                          .CheckRequestHeaders(RequestHeaders);
         });
         IHttpClientFactory factory = MockRequestHelper.CreateOfflineFactory(httpClient, httpClientSettings);
-        RequestService.RequestServiceOptions setupOptions = new(factory, httpClientSettings);
 
-        RequestService requestService = new(setupOptions);
-        RequestService.Options requestOptions = new RequestService.Options(HttpMethod.Get, ClientRoutePath)
-                                                                  .AddHeaders(RequestHeaders!)
-                                                                  .AddAcceptTypes(RequestAcceptTypes)
-                                                                  .AddHttpClientId(httpClientSettings.HttpClientId)
-                                                                  .AddRequestParameters(RequestQueryParameters!);
+        RequestService requestService = new(factory, httpClientSettings);
+        RequestService.Options requestOptions = RequestService.Options.WithRegisteredClient(HttpMethod.Get, ClientRoutePath, httpClientSettings.HttpClientId.Value)
+                                                                      .AddHeaders(RequestHeaders!)
+                                                                      .AddAcceptTypes(RequestAcceptTypes)
+                                                                      .AddRequestParameters(RequestQueryParameters!);
         HttpResponseMessage response = await requestService.ExecuteRequestAsync(requestOptions, RequestContent);
 
         MockRequestHelper.ValidateResponse(response, responseChecks =>
