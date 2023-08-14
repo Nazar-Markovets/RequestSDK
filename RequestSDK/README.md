@@ -28,30 +28,26 @@ Here is first patch of RequestSDK library.
 - Added new way to build request options that may save a developer from mistakes
 
 ## Ability to connect request service
+
+##### 1. Configure HttpClients and Register Request Service
 ```c#
 
 // -- Program.cs
 
 builder.Services.RegisterHttpClients
 (
-    gitClient => 
-    { 
+    gitClient => { 
         gitClient.HttpClientName = "GIT.1";
         gitClient.HttpClientId = 1;
-        gitClient.BaseAddress = new Uri("https://api.github.com");
+        gitClient.BaseAddress = new Uri("https://example.com");
         gitClient.Authentication = (schemes) => new AuthenticationHeaderValue(schemes.Bearer, "XXX-KEY-XXX");
-    },
-    gitExtendedClient =>
-    {
-        gitExtendedClient.HttpClientName = "GIT.2";
-        gitExtendedClient.HttpClientId = 2;
-        gitExtendedClient.BaseAddress = new Uri("https://api.gitextended.com");
     }
 );
 
 builder.Services.RegisterRequestService();
 
 ```
+##### 2. Use Request Service in destination class
 
 ```c#
 
@@ -69,18 +65,77 @@ public class YourController : ControllerBase
     public async Task<IActionResult> Get()
     {
         RequestService.Options options = RequestService.Options.WithRegisteredClient(HttpMethod.Get, "user/packages/versions", 1);
-        HttpResponseMessage response = await requestService.ExecuteRequestAsync(options
-                                                                                .AddHeader(HeaderNames.UserAgent, "local")
-                                                                                .AddHeader(HeaderNames.Accept, "application/vnd.github+json")
-                                                                                .AddHeader(HeaderNames.Host, "api.github.com"));
+        HttpResponseMessage response = await requestService.ExecuteRequestAsync(options);
         var content = await response.Content.ReadAsStringAsync();
         return Ok(content);
     }
 }
 
-
-
 ```
 
+## Use recognizable routing
+##### 1. Implement Routing Strategy
+
+```c#
+// -- Routing.cs
+
+public partial class Routing
+{
+    [ControllerName("Hub")]
+    public static class HubController
+    {
+        [ControllerHttpMethod(HttpRequestMethod.Post)]
+        public const string SendMessageForAllUsers = "sendMessage";
+
+        [ControllerHttpMethod(HttpRequestMethod.Post)]
+        public const string SendMessageForGroupUsers = "sendMessageGroup"; 
+
+    }
+}
+```
+
+##### 1. Configure HttpClients and Register Request Service
+```c#
+
+// -- Program.cs
+
+builder.Services.RegisterHttpClients
+(
+    hubClient => { 
+        hubClient.HttpClientName = "Hub.Client";
+        hubClient.HttpClientId = 1;
+        hubClient.BaseAddress = new Uri("https://example.com");
+        hubClient.ClientRoutingType = typeof(Routing);
+    }
+);
+
+builder.Services.RegisterRequestService();
+
+```
+##### 2. Use Request Service in destination class
+
+```c#
+
+// -- YourController.cs
+
+[Route("[controller]")]
+[ApiController]
+public class YourController : ControllerBase
+{
+    private readonly RequestService requestService;
+
+    public StatusController(RequestService requestService) => this.requestService = requestService;
+
+    [HttpGet("your_route")]
+    public async Task<IActionResult> Get()
+    {
+        RequestService.Options options = RequestService.Options.WithRegisteredRouting(Routing.HubController.SendMessageForAllUsers, 1);
+        HttpResponseMessage response = await requestService.ExecuteRequestAsync(options);
+        var content = await response.Content.ReadAsStringAsync();
+        return Ok(content);
+    }
+}
+
+```
 </details>
 

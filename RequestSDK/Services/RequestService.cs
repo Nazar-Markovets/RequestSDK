@@ -1,13 +1,15 @@
-﻿using System.Collections.Immutable;
-using System.Reflection;
-using System.Text.Json;
+﻿using System.Web;
 using System.Text;
+using System.Text.Json;
+using System.Reflection;
+using System.Collections.Specialized;
+using System.Collections.Immutable;
+
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.AspNetCore.WebUtilities;
+
 using RequestSDK.Attributes;
 using RequestSDK.Enums;
-using System.Collections.Specialized;
-using Microsoft.AspNetCore.WebUtilities;
-using System.Web;
 
 namespace RequestSDK.Services;
 
@@ -76,42 +78,30 @@ public partial class RequestService
         return httpClient.SendAsync(requestMessage, options.CompletionOption, cancellationToken);
     }
 
+    #endregion Sending Request
+
+    #region Recognizable Routing
+
     private void TryGetEndpointMetadata(Options options, Type? contanterType)
     {
-        if(options.UseSdkRouting == false || contanterType == null) return;
-       
+        if (options.UseRecognizableRouting == false || contanterType == null) return;
+
         string targetEndpoint = options.Path.ToLowerInvariant();
         string cacheKey = contanterType.FullName ?? contanterType.Name;
         _cache ??= new MemoryCache(new MemoryCacheOptions());
 
-        (string Endpoint, string RequestPath, HttpMethod RequestMethod) = 
+        (string Endpoint, string RequestPath, HttpMethod RequestMethod) =
             _cache.GetOrCreate(cacheKey, factory =>
-            { 
-                factory.AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1); 
-                return GetContanterMetadata(contanterType); 
+            {
+                factory.AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1);
+                return GetContanterMetadata(contanterType);
             })!.FirstOrDefault(r => r.Endpoint.Equals(targetEndpoint));
 
-        options.Path = RequestPath;
-        options.HttpMethod = RequestMethod;
+        options.SetHttpMethod(RequestMethod)
+               .SetRequestEndpoint(RequestPath);
     }
 
-    private static void SetRequestHeaders(Options options, HttpClient httpClient, HttpClientSettings? httpClientSettings)
-    {
-        httpClient.DefaultRequestHeaders.Clear();
-        httpClient.DefaultRequestHeaders.Authorization = options.Authentication ?? httpClientSettings?.Authentication?.Invoke(new());
-        options.AcceptTypes.ForEach(acceptType => httpClient.DefaultRequestHeaders.Accept.Add(acceptType));
-        options.CustomHeaders?.ToList()?.ForEach(header => httpClient.DefaultRequestHeaders.Add(header.Key, header.Value));
-    }
-
-    private static void SetRequestPath(Options options, HttpClient httpClient, HttpClientSettings? httpClientSettings)
-    {
-        bool useOptionsAsPath = TryUriParse(options.Path, out Uri? optionsPath);
-        string basePath = GetBasePath(httpClient.BaseAddress ?? httpClientSettings?.BaseAddress) ?? GetBasePath(optionsPath) ?? throw new Exception("Can't create request uri. Check request options");
-        string? path = useOptionsAsPath ? AppendPathSafely(basePath!, optionsPath!.PathAndQuery) : AppendPathSafely(basePath!, options.Path);
-        options.Path = QueryHelpers.AddQueryString(path, options.RequestParameters?.ToDictionary(k => k.Key, v => v.Value) ?? new());
-    }
-
-    private ImmutableSortedSet<(string Endpoint, string RequestPath, HttpMethod RequestMethod)> GetContanterMetadata(Type clientRoutingType) => 
+    private ImmutableSortedSet<(string Endpoint, string RequestPath, HttpMethod RequestMethod)> GetContanterMetadata(Type clientRoutingType) =>
         clientRoutingType.GetTypeInfo().DeclaredNestedTypes
                          .SelectMany(typeInfo => typeInfo.DeclaredFields
                          .Where(fieldInfo => fieldInfo.IsLiteral && !fieldInfo.IsInitOnly)
@@ -125,12 +115,7 @@ public partial class RequestService
                              return (route, $"{controller}/{route}", _httpMethods[routeMethod]);
                          })).ToImmutableSortedSet();
 
-    public static StringContent? GetCorrectHttpContent<T>(T? content, string contentType, JsonSerializerOptions serializerOptions = default!) => 
-        content is null ? default : new StringContent(JsonSerializer.Serialize(content, serializerOptions), 
-                                                      Encoding.UTF8, contentType);
-
-
-    #endregion Sending Request
+    #endregion Recognizable Routing
 
     #region SSE Streaming
 
@@ -169,8 +154,6 @@ public partial class RequestService
     }
 
     #endregion SSE Streaming
-
-
 
     #region Static Methods
 
@@ -307,6 +290,26 @@ public partial class RequestService
             Uri.UriSchemeNetPipe
         };
         return validSchemes.Contains(path.Scheme);
+    }
+
+    public static StringContent? GetCorrectHttpContent<T>(T? content, string contentType, JsonSerializerOptions serializerOptions = default!) =>
+        content is null ? default : new StringContent(JsonSerializer.Serialize(content, serializerOptions),
+                                                      Encoding.UTF8, contentType);
+
+    private static void SetRequestHeaders(Options options, HttpClient httpClient, HttpClientSettings? httpClientSettings)
+    {
+        httpClient.DefaultRequestHeaders.Clear();
+        httpClient.DefaultRequestHeaders.Authorization = options.Authentication ?? httpClientSettings?.Authentication?.Invoke(new());
+        options.AcceptTypes.ForEach(acceptType => httpClient.DefaultRequestHeaders.Accept.Add(acceptType));
+        options.CustomHeaders?.ToList()?.ForEach(header => httpClient.DefaultRequestHeaders.Add(header.Key, header.Value));
+    }
+
+    private static void SetRequestPath(Options options, HttpClient httpClient, HttpClientSettings? httpClientSettings)
+    {
+        bool useOptionsAsPath = TryUriParse(options.Path, out Uri? optionsPath);
+        string basePath = GetBasePath(httpClient.BaseAddress ?? httpClientSettings?.BaseAddress) ?? GetBasePath(optionsPath) ?? throw new Exception("Can't create request uri. Check request options");
+        string? path = useOptionsAsPath ? AppendPathSafely(basePath!, optionsPath!.PathAndQuery) : AppendPathSafely(basePath!, options.Path);
+        options.SetRequestEndpoint(QueryHelpers.AddQueryString(path, options.RequestParameters?.ToDictionary(k => k.Key, v => v.Value) ?? new()));
     }
 
     #endregion Static Methods

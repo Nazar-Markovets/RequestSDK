@@ -142,7 +142,12 @@ public partial class RequestService_Testing : FixtureBase
         RequestService.Options requestOptions = RequestService.Options.WithRegisteredClient(HttpMethod.Get, ClientRoutePath, httpClientSettings.HttpClientId.Value)
                                                                       .AddHeaders(RequestHeaders!)
                                                                       .AddAcceptTypes(RequestAcceptTypes)
-                                                                      .AddRequestParameters(RequestQueryParameters!);
+                                                                      .AddRequestParameters(RequestQueryParameters!)
+                                                                      .AddContentType(MediaTypeNames.Application.Json)
+                                                                      .AddCustomFlags("Key", true)
+                                                                      .AddAuthentication(scheme => new AuthenticationHeaderValue(scheme.Bearer, "X-Token"))
+                                                                      .ForStreamResponse();
+
         HttpResponseMessage response = await requestService.ExecuteRequestAsync(requestOptions, RequestContent);
 
         MockRequestHelper.ValidateResponse(response, responseChecks =>
