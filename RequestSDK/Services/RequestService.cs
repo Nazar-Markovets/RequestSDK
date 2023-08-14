@@ -62,7 +62,7 @@ public partial class RequestService
     private Task<HttpResponseMessage> MakeRequest(Options options, HttpContent? content, CancellationToken cancellationToken)
     {
         byte requestedSetting = byte.TryParse(options.HttpClientId?.ToString(), out byte clientId) ? clientId : byte.MinValue;
-        HttpClientSettings? registeredSetting = _instances?.ContainsKey(requestedSetting) is true ? _instances![requestedSetting] : default;
+        HttpClientSettings? registeredSetting = _instances?.ContainsKey(requestedSetting) == true ? _instances![requestedSetting] : default;
         HttpClient httpClient = _httpClientFactory?.CreateClient(registeredSetting?.HttpClientName ?? Microsoft.Extensions.Options.Options.DefaultName) ?? _defaultHttpClient;
 
         TryGetEndpointMetadata(options, registeredSetting?.ClientRoutingType);
@@ -217,7 +217,7 @@ public partial class RequestService
 
     public static string? GetBasePath(string? path)
     {
-        if (path is null) return default;
+        if (path == null) return default;
         return TryUriParse(path, out Uri? url) && HasValidScheme(url!)
         ? $"{url!.Scheme}{Uri.SchemeDelimiter}{url!.Authority}"
         : throw new InvalidCastException("Can't convert invalid path");
@@ -228,7 +228,7 @@ public partial class RequestService
 
     public static string? GetBasePath(Uri? path)
     {
-        if (path is null) return default;
+        if (path == null) return default;
         if (HasValidScheme(path) == false) throw new UriFormatException("Path has invalid scheme");
         return $"{path.Scheme}{Uri.SchemeDelimiter}{path.Authority}";
     }
@@ -293,7 +293,7 @@ public partial class RequestService
     }
 
     public static StringContent? GetCorrectHttpContent<T>(T? content, string contentType, JsonSerializerOptions serializerOptions = default!) =>
-        content is null ? default : new StringContent(JsonSerializer.Serialize(content, serializerOptions),
+        content == null ? default : new StringContent(JsonSerializer.Serialize(content, serializerOptions),
                                                       Encoding.UTF8, contentType);
 
     private static void SetRequestHeaders(Options options, HttpClient httpClient, HttpClientSettings? httpClientSettings)
