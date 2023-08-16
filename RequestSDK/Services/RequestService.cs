@@ -1,8 +1,5 @@
-﻿using System.Web;
-using System.Text;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Reflection;
-using System.Collections.Specialized;
 using System.Collections.Immutable;
 
 using Microsoft.Extensions.Caching.Memory;
@@ -10,6 +7,8 @@ using Microsoft.AspNetCore.WebUtilities;
 
 using RequestSDK.Attributes;
 using RequestSDK.Enums;
+using RequestSDK.Helpers;
+using RequestSDK.Extensions;
 
 namespace RequestSDK.Services;
 
@@ -33,7 +32,7 @@ public partial class RequestService
         { HttpRequestMethod.Connect, new HttpMethod("CONNECT") },
         { HttpRequestMethod.Options, HttpMethod.Options },
     };
-    
+
     #endregion Private Fields
 
     public RequestService(HttpClient httpClient)
@@ -41,7 +40,7 @@ public partial class RequestService
         _defaultHttpClient = httpClient ?? throw new ArgumentNullException("Given HttpClient can't be null");
     }
 
-    public RequestService(IHttpClientFactory? httpClientFactory, params HttpClientSettings[] httpClientSettings)
+    internal RequestService(IHttpClientFactory? httpClientFactory, params HttpClientSettings[] httpClientSettings)
     {
         _httpClientFactory = httpClientFactory;
         _instances = httpClientSettings?.ToDictionary(kv => kv.HttpClientId!.Value, kv => kv);
@@ -57,15 +56,16 @@ public partial class RequestService
         MakeRequest(requestOptions, default, cancellationToken);
 
     public Task<HttpResponseMessage> ExecuteRequestAsync<TBody>(Options requestOptions, TBody DTO, JsonSerializerOptions serializerOptions = default!, CancellationToken cancellationToken = default) =>
-        MakeRequest(requestOptions, GetCorrectHttpContent(DTO, requestOptions.ContentType, serializerOptions), cancellationToken);
+        MakeRequest(requestOptions, HttpContentHelper.ConvertToHttpContent(DTO, requestOptions.ContentType, serializerOptions), cancellationToken);
 
     private Task<HttpResponseMessage> MakeRequest(Options options, HttpContent? content, CancellationToken cancellationToken)
     {
-        byte requestedSetting = byte.TryParse(options.HttpClientId?.ToString(), out byte clientId) ? clientId : byte.MinValue;
-        HttpClientSettings? registeredSetting = _instances?.ContainsKey(requestedSetting) == true ? _instances![requestedSetting] : default;
+        HttpClientSettings? registeredSetting = options.HttpClientId.HasValue && 
+                                                _instances?.TryGetValue(options.HttpClientId.Value, out HttpClientSettings? setting) == true ? setting : default;
+
         HttpClient httpClient = _httpClientFactory?.CreateClient(registeredSetting?.HttpClientName ?? Microsoft.Extensions.Options.Options.DefaultName) ?? _defaultHttpClient;
 
-        TryGetEndpointMetadata(options, registeredSetting?.ClientRoutingType);
+        TryGetEndpointMetadata(options, registeredSetting);
         SetRequestPath(options, httpClient, registeredSetting);
         SetRequestHeaders(options, httpClient, registeredSetting);
 
@@ -82,11 +82,11 @@ public partial class RequestService
 
     #region Recognizable Routing
 
-    private void TryGetEndpointMetadata(Options options, Type? contanterType)
+    private void TryGetEndpointMetadata(Options options, HttpClientSettings? httpClientSettings)
     {
+        Type? contanterType = httpClientSettings?.ClientRoutingType;
         if (options.UseRecognizableRouting == false || contanterType == null) return;
 
-        string targetEndpoint = options.Path.ToLowerInvariant();
         string cacheKey = contanterType.FullName ?? contanterType.Name;
         _cache ??= new MemoryCache(new MemoryCacheOptions());
 
@@ -95,7 +95,7 @@ public partial class RequestService
             {
                 factory.AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1);
                 return GetContanterMetadata(contanterType);
-            })!.FirstOrDefault(r => r.Endpoint.Equals(targetEndpoint));
+            })!.FirstOrDefault(r => r.Endpoint.Equals(options.Path));
 
         options.SetHttpMethod(RequestMethod)
                .SetRequestEndpoint(RequestPath);
@@ -153,163 +153,40 @@ public partial class RequestService
         }
     }
 
+    private static string ClearSSePreffix(string text) => text.IndexOf("data:", StringComparison.Ordinal) != 0 ? text.Trim() : text[5..].Trim();
+
+
     #endregion SSE Streaming
 
     #region Static Methods
-
-    public static KeyValuePair<string, string> RequestParameter(string? key, string? value) =>
-        string.IsNullOrWhiteSpace(key)
-        ? new(string.Empty, string.Empty) 
-        : new(key, value ?? string.Empty);
-
-    public static KeyValuePair<string, string> RequestHeader(string? key, params string?[] value) => 
-        string.IsNullOrWhiteSpace(key)
-        ? new(string.Empty, string.Empty)
-        : new(key, string.Join(", ", value?.Where(v => !string.IsNullOrWhiteSpace(v)) ?? Array.Empty<string>()));
-
-    public static string CombineQueryParameters(bool ignoreEmpty, params KeyValuePair<string, string?>[] queryParameters)
-    {
-        if (queryParameters.Length > 0)
-        {
-            NameValueCollection queryString = new(queryParameters.Length);
-            for (int i = 0; i < queryParameters.Length; i++)
-            {
-                if (string.IsNullOrWhiteSpace(queryParameters[i].Key)) continue;
-                if (ignoreEmpty && string.IsNullOrWhiteSpace(queryParameters[i].Value)) continue;
-                queryString.Add(queryParameters[i].Key, queryParameters[i].Value);
-            }
-            return string.Join('&', queryString.AllKeys.Select(key => $"{key}={string.Join(',', queryString.GetValues(key)?.Distinct().Where(value => !string.IsNullOrEmpty(value)) ?? Array.Empty<string>())}"));
-        }
-        return string.Empty;
-    }
-
-    public static Dictionary<string, string?> GetQueryParameters(Uri uri) => GetQueryParameters(uri.Query);
-
-    public static Dictionary<string, string?> GetQueryParameters(string query)
-    {
-        NameValueCollection collection = HttpUtility.ParseQueryString(query);
-        return collection.AllKeys.Where(k => !string.IsNullOrWhiteSpace(k)).ToDictionary(k => k!, k => collection[k]);
-    }
-
-    public static string CombineQueryWithParameters(string path, bool ignoreEmpty, params KeyValuePair<string, string?>[] pairs)
-    {
-        if (string.IsNullOrWhiteSpace(path.Trim())) throw new InvalidCastException("Can't combine empty query string with parameters");
-
-        int startParametersIndex = path.IndexOf('?');
-        bool hasParameters = startParametersIndex > 0 && startParametersIndex < path.Length;
-        string parameters = pairs.Length > 0 ? (hasParameters ? '&' : '?') + CombineQueryParameters(ignoreEmpty, pairs) : string.Empty;
-        return string.Concat(path, parameters);
-    }
-
-    public static string CombineQueryWithParameters(string path, string parameters, bool ignoreEmpty)
-    {
-        if (string.IsNullOrWhiteSpace(path.Trim())) throw new InvalidCastException("Can't combine empty query string with parameters");
-
-        int startParametersIndex = path.IndexOf('?');
-        bool hasParameters = startParametersIndex > 0 && startParametersIndex < path.Length;
-        Dictionary<string, string?> queryParameters = GetQueryParameters(parameters);
-        string parametersString = queryParameters.Count > 0 ? (hasParameters ? '&' : '?') + CombineQueryParameters(ignoreEmpty, queryParameters.ToArray()) : string.Empty;
-        return string.Concat(path, parametersString);
-    }
-
-    public static string CombineQueryWithParameters(string path, string route, bool ignoreEmpty, params KeyValuePair<string, string?>[] pairs) =>
-        CombineQueryWithParameters(AppendPathSafely(path, route), ignoreEmpty, pairs);
-
-    public static string? GetBasePath(string? path)
-    {
-        if (path == null) return default;
-        return TryUriParse(path, out Uri? url) && HasValidScheme(url!)
-        ? $"{url!.Scheme}{Uri.SchemeDelimiter}{url!.Authority}"
-        : throw new InvalidCastException("Can't convert invalid path");
-    }
-
-    public static bool TryUriParse(string? path, out Uri? url) =>
-        Uri.TryCreate(path, new UriCreationOptions() { DangerousDisablePathAndQueryCanonicalization = false }, out url);
-
-    public static string? GetBasePath(Uri? path)
-    {
-        if (path == null) return default;
-        if (HasValidScheme(path) == false) throw new UriFormatException("Path has invalid scheme");
-        return $"{path.Scheme}{Uri.SchemeDelimiter}{path.Authority}";
-    }
-
-    public static string AppendPathSafely(string path, string route, bool cleanExistsParameters = true, bool autoEncode = false)
-    {
-        path = path.Trim();
-        if (string.IsNullOrWhiteSpace(path)) throw new ArgumentNullException("Can't combine empty absolute path");
-        route = route.TrimStart('/').Trim();
-        string basePath = GetBasePath(path)!;
-        string queryPath = $"{basePath}/{route}";
-
-        if (cleanExistsParameters is false)
-        {
-            string parameters = TryUriParse(path, out Uri? url) ? url!.Query : string.Empty;
-            return autoEncode ? HttpUtility.UrlEncode(CombineQueryWithParameters(queryPath, parameters, true)) : CombineQueryWithParameters(queryPath, parameters, true);
-        }
-
-        return autoEncode ? HttpUtility.UrlEncode(queryPath) : queryPath;
-    }
-
-    public static string Base64Encode(string? plainText) => Convert.ToBase64String(Encoding.UTF8.GetBytes(plainText ?? string.Empty));
-    public static string Base64Decode(string? base64EncodedData) => Encoding.UTF8.GetString(Convert.FromBase64String(base64EncodedData ?? string.Empty));
-
-    public static string Base64EncodeObject<T>(T obj)
-    {
-        string json = JsonSerializer.Serialize(obj);
-        byte[] jsonBytes = Encoding.UTF8.GetBytes(json);
-        string base64String = Convert.ToBase64String(jsonBytes);
-        return base64String;
-    }
-
-    public static T? Base64DecodeObject<T>(string base64EncodedJson)
-    {
-        byte[] jsonBytes = Convert.FromBase64String(base64EncodedJson);
-        string json = Encoding.UTF8.GetString(jsonBytes);
-        return JsonSerializer.Deserialize<T>(json);
-    }
-
-    private static string ClearSSePreffix(string text) => text.IndexOf("data:", StringComparison.Ordinal) != 0 ? text.Trim() : text[5..].Trim();
-    private static bool HasValidScheme(Uri path)
-    {
-        string[] validSchemes = {
-            Uri.UriSchemeFile,
-            Uri.UriSchemeFtp,
-            Uri.UriSchemeSftp,
-            Uri.UriSchemeFtps,
-            Uri.UriSchemeGopher,
-            Uri.UriSchemeHttp,
-            Uri.UriSchemeHttps,
-            Uri.UriSchemeWs,
-            Uri.UriSchemeWss,
-            Uri.UriSchemeMailto,
-            Uri.UriSchemeNews,
-            Uri.UriSchemeNntp,
-            Uri.UriSchemeSsh,
-            Uri.UriSchemeTelnet,
-            Uri.UriSchemeNetTcp,
-            Uri.UriSchemeNetPipe
-        };
-        return validSchemes.Contains(path.Scheme);
-    }
-
-    public static StringContent? GetCorrectHttpContent<T>(T? content, string contentType, JsonSerializerOptions serializerOptions = default!) =>
-        content == null ? default : new StringContent(JsonSerializer.Serialize(content, serializerOptions),
-                                                      Encoding.UTF8, contentType);
 
     private static void SetRequestHeaders(Options options, HttpClient httpClient, HttpClientSettings? httpClientSettings)
     {
         httpClient.DefaultRequestHeaders.Clear();
         httpClient.DefaultRequestHeaders.Authorization = options.Authentication ?? httpClientSettings?.Authentication?.Invoke(new());
         options.AcceptTypes.ForEach(acceptType => httpClient.DefaultRequestHeaders.Accept.Add(acceptType));
-        options.CustomHeaders?.ToList()?.ForEach(header => httpClient.DefaultRequestHeaders.Add(header.Key, header.Value));
+        options.RequestHeaders.ForEach(header => httpClient.DefaultRequestHeaders.Add(header.Key, header.Value));
     }
 
     private static void SetRequestPath(Options options, HttpClient httpClient, HttpClientSettings? httpClientSettings)
     {
-        bool useOptionsAsPath = TryUriParse(options.Path, out Uri? optionsPath);
-        string basePath = GetBasePath(httpClient.BaseAddress ?? httpClientSettings?.BaseAddress) ?? GetBasePath(optionsPath) ?? throw new Exception("Can't create request uri. Check request options");
-        string? path = useOptionsAsPath ? AppendPathSafely(basePath!, optionsPath!.PathAndQuery) : AppendPathSafely(basePath!, options.Path);
-        options.SetRequestEndpoint(QueryHelpers.AddQueryString(path, options.RequestParameters?.ToDictionary(k => k.Key, v => v.Value) ?? new()));
+        UriKind uriKind = Uri.IsWellFormedUriString(options.Path, UriKind.Absolute) ? UriKind.Absolute : UriKind.Relative;
+        if(Uri.TryCreate(options.Path, UriKind.RelativeOrAbsolute, out Uri? endpointUri))
+        {
+            string resultPath = endpointUri.ToString();
+            if(uriKind == UriKind.Relative)
+            {
+                Uri? registeredHttpClientUri = httpClient.BaseAddress ?? httpClientSettings?.BaseAddress;
+                resultPath = Uri.IsWellFormedUriString(registeredHttpClientUri?.ToString(), UriKind.Absolute)
+                             ? QueryHelper.AppendToEnd(registeredHttpClientUri, resultPath).ToString()
+                             : throw new UriFormatException($"Relative path {options.Path} can't be used if HttpClient BaseAddress is not set");
+            }
+
+            options.SetRequestEndpoint(QueryHelpers.AddQueryString(resultPath, options.RequestParameters));
+            return;
+        }
+
+        throw new UriFormatException("Given Options Path is not valid for building request path");
     }
 
     #endregion Static Methods

@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Net.Mime;
 
+using RequestSDK.Helpers;
 using RequestSDK.Services;
 
 namespace RequestSDK.Test.ClassData;
@@ -44,20 +45,20 @@ public sealed class RequestData : IEnumerable<object[]>
         Name = "John"
     };
 
-    private readonly string ClientBasePath = "https://example.com";
+    private readonly string ClientBasePath = "https://example.com/rest";
     private readonly string ClientEndPoint = "controller/action";
     private readonly string[] AcceptTypes = new string[] { MediaTypeNames.Application.Json, MediaTypeNames.Text.Html };
 
     private readonly KeyValuePair<string, string>[] RequestHeaders = new[]
     {
-        RequestService.RequestHeader("X-KEY", "X-VALUE-1", "X-VALUE-2")
+        new KeyValuePair<string, string>("X-KEY", "X-VALUE-1, X-VALUE-2")
     };
 
     private readonly KeyValuePair<string, string>[] RequestParameters = new[]
     {
-        RequestService.RequestParameter("first-name", "john"),
-        RequestService.RequestParameter("last-name", "doe"),
-        RequestService.RequestParameter("age", "21")
+        new KeyValuePair<string, string>("first-name", "john"),
+        new KeyValuePair<string, string>("last-name", "doe"),
+        new KeyValuePair<string, string>("age", "21")
     };
 
     public IEnumerator<object[]> GetEnumerator()

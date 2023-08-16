@@ -1,12 +1,14 @@
 ﻿using System.Net.Http.Headers;
 using System.Net.Mime;
-using System.Xml.Linq;
-using System.Linq;
+
+using RequestSDK.Builders;
+using RequestSDK.Validators;
 
 namespace RequestSDK.Services;
 
 public partial class RequestService
 {
+
     public class Options
     {
         #region Private Fields
@@ -15,23 +17,24 @@ public partial class RequestService
         private string _requestPath;
         private string _requestContentType;
         private byte? _httpClientId;
-        private KeyValuePair<string, string?>[] _requestParameters;
         private List<MediaTypeWithQualityHeaderValue> _requestAcceptTypes;
-        private Dictionary<string, string?>? _requestHeaders;
         private Dictionary<string, object?>? _requestCustomActionFlags;
         private AuthenticationHeaderValue? _authenticationHeader;
         private HttpCompletionOption _requestCompletionOptions = HttpCompletionOption.ResponseContentRead;
         private bool _useRecognizableRouting = false;
+        private OptionsBuilder _requestParameterBuilder;
+        private OptionsBuilder _requestHeadersBuilder;
+        private static RequestOptionsValidator _optionsValidator = new();
         #endregion Private Fields
 
         #region Readonly Properties
         internal HttpMethod? HttpMethod => _httpMethod;
         internal string Path => _requestPath;
         internal byte? HttpClientId => _httpClientId;
-        internal KeyValuePair<string, string?>[] RequestParameters => _requestParameters;
+        internal Dictionary<string, string> RequestParameters => _requestParameterBuilder.Build();
+        internal Dictionary<string, string> RequestHeaders => _requestHeadersBuilder.Build();
         internal List<MediaTypeWithQualityHeaderValue> AcceptTypes => _requestAcceptTypes;
 
-        internal Dictionary<string, string?>? CustomHeaders => _requestHeaders;
         internal AuthenticationHeaderValue? Authentication => _authenticationHeader;
         internal HttpCompletionOption CompletionOption => _requestCompletionOptions;
         internal string ContentType => _requestContentType;
@@ -42,6 +45,7 @@ public partial class RequestService
         /// </summary>
         internal bool UseRecognizableRouting => _useRecognizableRouting;
 
+
         #endregion Readonly Properties
 
         private Options()
@@ -49,14 +53,15 @@ public partial class RequestService
             _requestCompletionOptions = HttpCompletionOption.ResponseContentRead;
             _requestContentType = MediaTypeNames.Application.Json;
             _requestAcceptTypes = new List<MediaTypeWithQualityHeaderValue>() { new MediaTypeWithQualityHeaderValue("*/*") };
-            _requestParameters = Array.Empty<KeyValuePair<string, string?>>();
+            _requestParameterBuilder = new RequestOptionsBuilder(_optionsValidator);
+            _requestHeadersBuilder = new RequestOptionsBuilder(_optionsValidator);
             _requestPath = string.Empty;
         }
 
         private Options(HttpMethod httpMethod, string requestPath, byte? registeredHttpClientId = default) : this()
         {
             _httpMethod = httpMethod;
-            _requestPath = requestPath;
+            _requestPath = requestPath.Trim().ToLower();
             _httpClientId = registeredHttpClientId;
         }
 
@@ -76,6 +81,13 @@ public partial class RequestService
         public static Options WithRegisteredRouting<TRoutingContainer>(string requestPath, TRoutingContainer clientId) where TRoutingContainer : Enum
         {
             return new() { _requestPath = requestPath, _httpClientId = Convert.ToByte(clientId), _useRecognizableRouting = true };
+        }
+
+        public Options ConfigureBuilders(OptionsBuilder? requestHeadersBuilder = default, OptionsBuilder? requestParametersBuilder = default)
+        {
+            _requestHeadersBuilder = requestHeadersBuilder ?? _requestHeadersBuilder;
+            _requestParameterBuilder = requestParametersBuilder ?? _requestParameterBuilder;
+            return this;
         }
 
         /// <summary>
@@ -105,51 +117,33 @@ public partial class RequestService
             return this;
         }
 
-        public Options AddRequestParameters(params KeyValuePair<string, string?>[] parameters)
+        public Options AddRequestParameter(string name, params string[] value)
         {
-            _requestParameters = parameters;
+            _requestParameterBuilder.Add(name, value);
+            return this;
+        }
+
+        public Options AddRequestParameters(Action<OptionsBuilder> buildConfiguration)
+        {
+            buildConfiguration(_requestParameterBuilder);
             return this;
         }
 
         /// <summary>
         /// Use <see cref="Microsoft.Net.Http.Headers.HeaderNames"/> to set correct Header Name
         /// </summary>
-        public Options AddHeader(string name, params string?[] value)
+        public Options AddHeader(string name, params string[] value)
         {
-            KeyValuePair<string, string> header = RequestHeader(name, value);
-            if (IsValidHeader(header!))
-            {
-                _requestHeaders ??= new Dictionary<string, string?>();
-                _requestHeaders.Add(header.Key, header.Value);
-            }
-
+            _requestHeadersBuilder.Add(name, value);
             return this;
         }
 
         /// <summary>
         /// Use <see cref="Microsoft.Net.Http.Headers.HeaderNames"/> to set correct Header Name
         /// </summary>
-        public Options AddHeader(KeyValuePair<string, string?> header)
+        public Options AddHeaders(Action<OptionsBuilder> buildConfiguration)
         {
-            if (IsValidHeader(header))
-            {
-                _requestHeaders ??= new Dictionary<string, string?>();
-                _requestHeaders.Add(header.Key, header.Value);
-            }
-
-            return this;
-        }
-
-        /// <summary>
-        /// Use <see cref="Microsoft.Net.Http.Headers.HeaderNames"/> to set correct Header Name
-        /// </summary>
-        public Options AddHeaders(params KeyValuePair<string, string?>[] headers)
-        {
-            _requestHeaders ??= new Dictionary<string, string?>(headers.Length);
-            
-            foreach (var header in headers.Where(header => IsValidHeader(header))) 
-                _requestHeaders.Add(header.Key, header.Value);
-
+            buildConfiguration(_requestHeadersBuilder);
             return this;
         }
 
@@ -181,6 +175,5 @@ public partial class RequestService
             return this;
         }
 
-        private static bool IsValidHeader(KeyValuePair<string, string?> header) => !string.IsNullOrWhiteSpace(header.Key) && !string.IsNullOrWhiteSpace(header.Value);
     }
 }

@@ -8,6 +8,8 @@ using RequestSDK.Test.ClassData;
 using System.Net.Mime;
 using Microsoft.Net.Http.Headers;
 using System.Net.Http.Headers;
+using Moq;
+using RequestSDK.Helpers;
 
 namespace RequestSDK.Test.Services;
 
@@ -33,7 +35,8 @@ public partial class RequestService_Testing : FixtureBase
         });
         IHttpClientFactory factory = MockRequestHelper.CreateOfflineFactory(httpClient, httpClientSettings);
 
-        RequestService requestService = new(factory, httpClientSettings);
+        //Activator.CreateInstance(typeof(RequestService), factory, httpClientSettings);
+        RequestService requestService = MockRequestHelper.MockRequestServiceDependencyInjection(factory, httpClientSettings);
         HttpResponseMessage response = await requestService.ExecuteRequestAsync(RequestService.Options.WithRegisteredClient(HttpMethod.Get, ClientBaseURL, httpClientSettings.HttpClientId.Value));
 
         MockRequestHelper.ValidateResponse(response, responseChecks =>
@@ -58,7 +61,7 @@ public partial class RequestService_Testing : FixtureBase
         });
         IHttpClientFactory factory = MockRequestHelper.CreateOfflineFactory(httpClient, httpClientSettings);
         
-        RequestService requestService = new(factory, httpClientSettings);
+        RequestService requestService = MockRequestHelper.MockRequestServiceDependencyInjection(factory, httpClientSettings);
         HttpResponseMessage response = await requestService.ExecuteRequestAsync(RequestService.Options.WithRegisteredClient(HttpMethod.Get, "controller/action", httpClientSettings.HttpClientId.Value));
 
         MockRequestHelper.ValidateResponse(response, responseChecks =>
@@ -106,7 +109,7 @@ public partial class RequestService_Testing : FixtureBase
         });
         IHttpClientFactory factory = MockRequestHelper.CreateOfflineFactory(httpClient, httpClientSettings);
 
-        RequestService requestService = new(factory, httpClientSettings);
+        RequestService requestService = MockRequestHelper.MockRequestServiceDependencyInjection(factory, httpClientSettings);
 
         HttpResponseMessage response = await requestService.ExecuteRequestAsync(RequestService.Options.WithRegisteredRouting(ActionRouting.UpdateMessage, httpClientSettings.HttpClientId));
 
@@ -130,7 +133,7 @@ public partial class RequestService_Testing : FixtureBase
         HttpClient httpClient = MockRequestHelper.CreateOfflineHttpClient(offlineResponse, ClientBasePath, requestChecks =>
         {
             requestChecks.CheckRequestMethod(HttpMethod.Get)
-                         .CheckRequestUrl(RequestService.CombineQueryWithParameters($"{ClientBasePath}/{ClientRoutePath}", false, RequestQueryParameters!))
+                         .CheckRequestUrl(QueryHelper.CombineQueryWithParameters($"{ClientBasePath}/{ClientRoutePath}", false, RequestQueryParameters!))
                          .CheckRequestAcceptType(RequestAcceptTypes)
                          .CheckRequestContent(RequestContent)
                          .CheckRequestParameters(RequestQueryParameters)
@@ -138,11 +141,11 @@ public partial class RequestService_Testing : FixtureBase
         });
         IHttpClientFactory factory = MockRequestHelper.CreateOfflineFactory(httpClient, httpClientSettings);
 
-        RequestService requestService = new(factory, httpClientSettings);
+        RequestService requestService = MockRequestHelper.MockRequestServiceDependencyInjection(factory, httpClientSettings);
         RequestService.Options requestOptions = RequestService.Options.WithRegisteredClient(HttpMethod.Get, ClientRoutePath, httpClientSettings.HttpClientId.Value)
-                                                                      .AddHeaders(RequestHeaders!)
+                                                                      .AddHeaders(builder => builder.AddRange(RequestHeaders!))
                                                                       .AddAcceptTypes(RequestAcceptTypes)
-                                                                      .AddRequestParameters(RequestQueryParameters!)
+                                                                      .AddRequestParameters(builder => builder.AddRange(RequestQueryParameters!))
                                                                       .AddContentType(MediaTypeNames.Application.Json)
                                                                       .AddCustomFlags("Key", true)
                                                                       .AddAuthentication(scheme => new AuthenticationHeaderValue(scheme.Bearer, "X-Token"))

@@ -1,12 +1,6 @@
-﻿using System.Net;
-using Microsoft.AspNetCore.Http;
-using System.Net.Http.Json;
-using RequestSDK.Services;
-using RequestSDK.Test.ClassData;
-using Xunit.Sdk;
-using System.Reflection;
-using System.Text;
-using RequestSDK.Test.Exceptions;
+﻿using System.Text;
+
+using RequestSDK.Helpers;
 
 namespace RequestSDK.Test.Base;
 
@@ -40,7 +34,7 @@ public partial class FixtureBase
 
         public RequestCheckHelper CheckRequestParameters(params KeyValuePair<string, string>[] parameters)
         {
-            AsParallelSync(() => Assert.Equal(parameters, RequestService.GetQueryParameters(_requestMessage.RequestUri!)!));
+            AsParallelSync(() => Assert.Equal(parameters, QueryHelper.GetQueryParameters(_requestMessage.RequestUri!)!));
             return this;
         }
 

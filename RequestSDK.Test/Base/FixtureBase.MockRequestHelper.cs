@@ -1,11 +1,11 @@
 ﻿using System.Net;
 using System.Net.Mime;
-using System.Text;
-using System.Text.Json;
 
 using Moq.Protected;
 using Moq;
 using RequestSDK.Services;
+using System.Reflection;
+using RequestSDK.Helpers;
 
 namespace RequestSDK.Test.Base;
 
@@ -13,13 +13,28 @@ public partial class FixtureBase
 {
     protected class MockRequestHelper
     {
+        internal static RequestService MockRequestServiceDependencyInjection(IHttpClientFactory httpClientFactory, params RequestService.HttpClientSettings[] httpClientSettings)
+        {
+            Type targetType = typeof(RequestService);
+
+            // Get the internal constructor
+            ConstructorInfo? constructor = targetType.GetConstructor(BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(IHttpClientFactory), typeof(RequestService.HttpClientSettings[]) }, null);
+
+            if (constructor != null)
+            {
+                RequestService instance = (RequestService)constructor.Invoke(new object[] { httpClientFactory, httpClientSettings });
+                return instance;
+            }
+            Assert.Fail("Can't mock dependency injection for Request Service");
+            return null;
+        }
 
         internal static HttpResponseMessage CreateOfflineResponse<T>(HttpStatusCode statusCode, T content)
         {
 
             HttpResponseMessage responseMessage = new()
             {
-                Content = RequestService.GetCorrectHttpContent(content, MediaTypeNames.Application.Json),
+                Content = HttpContentHelper.ConvertToHttpContent(content, MediaTypeNames.Application.Json),
                 StatusCode = statusCode,
             };
 
