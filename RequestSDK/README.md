@@ -139,3 +139,15 @@ public class YourController : ControllerBase
 ```
 </details>
 
+<details>
+<summary>Version 0.0.3</summary>
+
+##### Version changes
+- Hided constructor that can't be called without DJ
+- Modied way of building Request Options Headers/Query Parameters
+- Moved static methods from RequestService to Helpers -> QueryHelper/HttpContentHelper
+- Extended functionality of creating Query Parameters/Query Headers
+- Added ability to override functionality of building Request Options Headers/Query Parameters
+- Fixed appending registered HttpClient path and given path
+</details>
+
